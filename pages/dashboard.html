@@ -662,6 +662,19 @@
                 <h3>재고 현황</h3>
                 <button class="btn btn-primary btn-sm" onclick="openModal('inventory-modal')">+ 상품 등록</button>
               </div>
+              <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; padding:0 20px;">
+                <button class="btn btn-primary btn-sm" onclick="document.getElementById('inv-file-input').click()">
+                  이지포스 재고 엑셀 업로드
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="downloadInventoryExcel()">
+                  재고 현황 엑셀 다운로드
+                </button>
+                <input type="file" id="inv-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleInventoryUpload(this.files[0])">
+                <span id="inv-upload-status" style="font-size:13px; color:var(--gray-500); align-self:center;"></span>
+              </div>
+              <div style="padding:0 20px;">
+                <input type="text" id="inv-search" placeholder="상품명 또는 제작사 검색..." oninput="filterInventory()" style="width:100%; padding:10px; border:1px solid var(--gray-200); border-radius:8px; margin-bottom:12px; font-family:inherit; font-size:14px; box-sizing:border-box;">
+              </div>
               <div class="table-container">
                 <table>
                   <thead>
@@ -671,14 +684,18 @@
                       <th>현재 재고</th>
                       <th>최소 재고</th>
                       <th>상태</th>
-                      <th>최근 입고일</th>
+                      <th>판매가</th>
+                      <th>최종 업데이트</th>
                       <th>관리</th>
                     </tr>
                   </thead>
                   <tbody id="inventory-stock-list">
-                    <tr><td colspan="7" class="empty-state">등록된 상품이 없습니다.</td></tr>
+                    <tr><td colspan="8" class="empty-state">등록된 상품이 없습니다.</td></tr>
                   </tbody>
                 </table>
+              </div>
+              <div id="inv-show-more-wrap" style="text-align:center; padding:12px; display:none;">
+                <button class="btn btn-ghost btn-sm" id="inv-show-more-btn" onclick="showMoreInventory()" style="font-size:13px;">더보기</button>
               </div>
             </div>
           </div>
@@ -1484,25 +1501,25 @@
           <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px;">
             <div class="card" style="border:none; box-shadow:none; background:var(--primary-bg);">
               <div class="card-body" style="padding:14px; text-align:center;">
-                <div style="font-size:11px; color:var(--gray-500); font-weight:600; margin-bottom:4px;">올해 총매출</div>
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600; margin-bottom:4px;" id="report-label-sales">총매출</div>
                 <div style="font-size:22px; font-weight:800; color:var(--primary);" id="report-year-sales">₩0</div>
               </div>
             </div>
             <div class="card" style="border:none; box-shadow:none; background:var(--green-bg);">
               <div class="card-body" style="padding:14px; text-align:center;">
-                <div style="font-size:11px; color:var(--gray-500); font-weight:600; margin-bottom:4px;">올해 GM 수익</div>
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600; margin-bottom:4px;" id="report-label-gm">굿즈모먼트 수익</div>
                 <div style="font-size:22px; font-weight:800; color:var(--green);" id="report-year-gm">₩0</div>
               </div>
             </div>
             <div class="card" style="border:none; box-shadow:none; background:var(--blue-bg);">
               <div class="card-body" style="padding:14px; text-align:center;">
-                <div style="font-size:11px; color:var(--gray-500); font-weight:600; margin-bottom:4px;">올해 제작사 정산</div>
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600; margin-bottom:4px;" id="report-label-pub">제작사 정산</div>
                 <div style="font-size:22px; font-weight:800; color:var(--blue);" id="report-year-publisher">₩0</div>
               </div>
             </div>
             <div class="card" style="border:none; box-shadow:none; background:var(--yellow-bg);">
               <div class="card-body" style="padding:14px; text-align:center;">
-                <div style="font-size:11px; color:var(--gray-500); font-weight:600; margin-bottom:4px;">올해 어반 정산</div>
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600; margin-bottom:4px;" id="report-label-urban">어반플레이 정산</div>
                 <div style="font-size:22px; font-weight:800; color:#B8860B;" id="report-year-urban">₩0</div>
               </div>
             </div>

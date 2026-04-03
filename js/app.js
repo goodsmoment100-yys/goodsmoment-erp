@@ -3526,39 +3526,255 @@ function switchInventoryTab(tabName, btnEl) {
   }
 }
 
+// Inventory display limit
+var invDisplayLimit = 50;
+
 function renderInventoryStock() {
   var items = getInventoryStore();
   var tbody = document.getElementById('inventory-stock-list');
   if (!tbody) return;
 
-  if (items.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">등록된 상품이 없습니다.</td></tr>';
+  // Apply search filter
+  var searchEl = document.getElementById('inv-search');
+  var searchTerm = searchEl ? searchEl.value.trim().toLowerCase() : '';
+  var filtered = items;
+  if (searchTerm) {
+    filtered = items.filter(function(item) {
+      return (item.name || '').toLowerCase().indexOf(searchTerm) >= 0 ||
+             (item.publisher || '').toLowerCase().indexOf(searchTerm) >= 0 ||
+             (item.code || '').toLowerCase().indexOf(searchTerm) >= 0;
+    });
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">' + (searchTerm ? '검색 결과가 없습니다.' : '등록된 상품이 없습니다.') + '</td></tr>';
+    var moreWrap = document.getElementById('inv-show-more-wrap');
+    if (moreWrap) moreWrap.style.display = 'none';
     return;
   }
 
-  tbody.innerHTML = items.map(function(item, idx) {
+  // Show limited items
+  var displayItems = filtered.slice(0, invDisplayLimit);
+
+  tbody.innerHTML = displayItems.map(function(item, dispIdx) {
+    // Find original index for edit/delete
+    var idx = items.indexOf(item);
     var statusText, statusClass, warn;
     if (item.currentStock <= 0) {
       statusText = '품절'; statusClass = 'background:var(--red-bg); color:var(--red);'; warn = '';
-    } else if (item.currentStock < item.minStock) {
+    } else if (item.currentStock < (item.minStock || 5)) {
       statusText = '부족'; statusClass = 'background:var(--yellow-bg); color:#B8860B;'; warn = ' \u26A0\uFE0F';
     } else {
       statusText = '정상'; statusClass = 'background:var(--green-bg); color:var(--green);'; warn = '';
     }
 
+    var priceStr = item.price ? item.price.toLocaleString() + '원' : '-';
+    var dateStr = item.lastUpdate || item.lastReceived || '-';
+
     return '<tr>' +
-      '<td>' + item.publisher + '</td>' +
-      '<td><strong>' + item.name + '</strong>' + warn + '</td>' +
-      '<td style="font-weight:700;">' + item.currentStock + '</td>' +
-      '<td>' + item.minStock + '</td>' +
+      '<td>' + (item.publisher || '-') + '</td>' +
+      '<td><strong>' + item.name + '</strong>' + warn + (item.code ? ' <span style="font-size:11px; color:var(--gray-400);">(' + item.code + ')</span>' : '') + '</td>' +
+      '<td style="font-weight:700;">' + (item.currentStock || 0) + '</td>' +
+      '<td>' + (item.minStock || 5) + '</td>' +
       '<td><span style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; ' + statusClass + '">' + statusText + '</span></td>' +
-      '<td style="font-size:13px; color:var(--gray-500);">' + (item.lastReceived || '-') + '</td>' +
+      '<td style="font-size:13px;">' + priceStr + '</td>' +
+      '<td style="font-size:13px; color:var(--gray-500);">' + dateStr + '</td>' +
       '<td>' +
         '<button class="btn btn-ghost btn-sm" onclick="editInventoryItem(' + idx + ')" style="font-size:12px;">수정</button>' +
         '<button class="btn btn-ghost btn-sm" onclick="deleteInventoryItem(' + idx + ')" style="color:var(--red); font-size:12px;">삭제</button>' +
       '</td>' +
     '</tr>';
   }).join('');
+
+  // Show more button
+  var moreWrap = document.getElementById('inv-show-more-wrap');
+  if (moreWrap) {
+    if (filtered.length > invDisplayLimit) {
+      moreWrap.style.display = 'block';
+      var btn = document.getElementById('inv-show-more-btn');
+      if (btn) btn.textContent = '더보기 (' + invDisplayLimit + '/' + filtered.length + '개)';
+    } else {
+      moreWrap.style.display = 'none';
+    }
+  }
+}
+
+function showMoreInventory() {
+  invDisplayLimit += 50;
+  renderInventoryStock();
+}
+
+function filterInventory() {
+  invDisplayLimit = 50;
+  renderInventoryStock();
+}
+
+// ---- Excel Upload / Download ----
+
+function handleInventoryUpload(file) {
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = new Uint8Array(e.target.result);
+      var workbook = XLSX.read(data, { type: 'array' });
+      var sheet = workbook.Sheets[workbook.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+      var items = parseInventoryExcel(rows);
+
+      if (items.length > 0) {
+        localStorage.setItem('gm_inventory', JSON.stringify(items));
+        document.getElementById('inv-upload-status').textContent = file.name + ' — ' + items.length + '개 상품 로드 완료!';
+        document.getElementById('inv-upload-status').style.color = 'var(--green)';
+        invDisplayLimit = 50;
+        renderInventoryStock();
+        showToast(items.length + '개 상품 재고 업데이트 완료!', 'success');
+      } else {
+        showToast('파일에서 상품을 찾을 수 없습니다. 형식을 확인해주세요.', 'error');
+      }
+    } catch (err) {
+      showToast('파일 읽기 실패: ' + err.message, 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  // Reset input so same file can be re-uploaded
+  document.getElementById('inv-file-input').value = '';
+}
+
+function parseInventoryExcel(rows) {
+  var items = [];
+  var headerRow = -1;
+
+  // Find header row (within first 5 rows)
+  for (var i = 0; i < Math.min(rows.length, 5); i++) {
+    var rowStr = rows[i].join(',');
+    if (rowStr.indexOf('상품명') >= 0 || rowStr.indexOf('NO') >= 0) {
+      headerRow = i;
+      break;
+    }
+  }
+  if (headerRow === -1) return [];
+
+  // Parse number helper
+  var pn = function(v) {
+    if (v === undefined || v === null || v === '') return 0;
+    if (typeof v === 'number') return v;
+    return parseInt(String(v).replace(/[,\u20A9\s]/g, '')) || 0;
+  };
+
+  // Detect column positions from header
+  var headers = rows[headerRow];
+  var colName = -1, colCode = -1, colCat3 = -1;
+  var colOpenStock = -1, colSalesQty = -1, colCloseStock = -1, colPrice = -1;
+
+  headers.forEach(function(h, idx) {
+    var hs = String(h).replace(/\n/g, '').trim();
+    if (hs === '상품명') colName = idx;
+    if (hs === '상품코드') colCode = idx;
+    if (hs === '소분류') colCat3 = idx;
+    if (hs === '판매가') colPrice = idx;
+  });
+
+  // Detect stock-related columns
+  headers.forEach(function(h, idx) {
+    var hs = String(h).replace(/\n/g, '').trim();
+    if (hs === '기초재고') colOpenStock = idx;
+    if (hs === '매출') colSalesQty = idx;
+    if (hs === '기말재고') colCloseStock = idx;
+  });
+
+  // For 단품실사 format: 현재고 column
+  if (colOpenStock === -1) {
+    headers.forEach(function(h, idx) {
+      var hs = String(h).replace(/\n/g, '').trim();
+      if (hs === '현재고') colOpenStock = idx;
+    });
+  }
+
+  // Parse data rows (skip header + sub-header)
+  var startRow = headerRow + 2;
+  var currentCat3 = '';
+
+  for (var i = startRow; i < rows.length; i++) {
+    var row = rows[i];
+    if (!row || row.length === 0) continue;
+
+    var name = colName >= 0 ? String(row[colName] || '').trim() : '';
+    if (!name) continue;
+
+    // Update category
+    if (colCat3 >= 0 && row[colCat3] && String(row[colCat3]).trim()) {
+      currentCat3 = String(row[colCat3]).trim();
+    }
+
+    var code = colCode >= 0 ? String(row[colCode] || '').trim() : '';
+    var price = colPrice >= 0 ? pn(row[colPrice]) : 0;
+
+    var openStock = colOpenStock >= 0 ? pn(row[colOpenStock]) : 0;
+    var closeStock = colCloseStock >= 0 ? pn(row[colCloseStock]) : openStock;
+    var salesQty = colSalesQty >= 0 ? pn(row[colSalesQty]) : 0;
+    var stock = closeStock || openStock;
+
+    items.push({
+      id: 'inv_' + code + '_' + i,
+      publisher: currentCat3,
+      name: name,
+      code: code,
+      currentStock: stock,
+      minStock: 5,
+      price: price,
+      salesQty: salesQty,
+      lastUpdate: new Date().toISOString().split('T')[0],
+      lastReceived: new Date().toISOString().split('T')[0],
+      status: stock <= 0 ? '품절' : stock <= 5 ? '부족' : '정상'
+    });
+  }
+
+  return items;
+}
+
+function downloadInventoryExcel() {
+  var items = JSON.parse(localStorage.getItem('gm_inventory') || '[]');
+  if (items.length === 0) {
+    showToast('재고 데이터가 없습니다.', 'error');
+    return;
+  }
+
+  var wb = XLSX.utils.book_new();
+
+  // Sheet 1: 재고 현황
+  var header = ['제작사', '상품코드', '상품명', '현재고', '최소재고', '상태', '판매가', '최종 업데이트'];
+  var dataRows = items.map(function(item) {
+    var st = (item.currentStock || 0) <= 0 ? '품절' : (item.currentStock || 0) <= (item.minStock || 5) ? '부족' : '정상';
+    return [
+      item.publisher || '',
+      item.code || '',
+      item.name || '',
+      item.currentStock || 0,
+      item.minStock || 5,
+      item.status || st,
+      item.price || 0,
+      item.lastUpdate || item.lastReceived || ''
+    ];
+  });
+
+  // Sort by publisher then name
+  dataRows.sort(function(a, b) { return (a[0] + a[2]).localeCompare(b[0] + b[2]); });
+
+  var ws = XLSX.utils.aoa_to_sheet([header].concat(dataRows));
+  ws['!cols'] = [{wch:14},{wch:10},{wch:35},{wch:8},{wch:8},{wch:8},{wch:12},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws, '재고현황');
+
+  // Sheet 2: 부족/품절 상품
+  var lowItems = dataRows.filter(function(r) { return r[5] === '부족' || r[5] === '품절'; });
+  var ws2 = XLSX.utils.aoa_to_sheet([header].concat(lowItems));
+  ws2['!cols'] = [{wch:14},{wch:10},{wch:35},{wch:8},{wch:8},{wch:8},{wch:12},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws2, '부족_품절');
+
+  var today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+  XLSX.writeFile(wb, '굿즈모먼트_재고현황_' + today + '.xlsx');
+  showToast('재고 현황 엑셀 다운로드 완료', 'success');
 }
 
 function saveInventoryItem() {

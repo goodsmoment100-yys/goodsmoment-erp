@@ -801,6 +801,15 @@ function loadReport() {
   const period = document.getElementById('report-period') ? document.getElementById('report-period').value : 'monthly';
   const year = document.getElementById('report-year') ? document.getElementById('report-year').value : '2026';
 
+  // 기간에 따라 라벨 업데이트
+  const periodLabels = { monthly: year + '년', quarterly: year + '년', half: year + '년', yearly: year + '년' };
+  const prefix = periodLabels[period] || year + '년';
+  const el = (id) => document.getElementById(id);
+  if (el('report-label-sales')) el('report-label-sales').textContent = prefix + ' 총매출';
+  if (el('report-label-gm')) el('report-label-gm').textContent = prefix + ' 굿즈모먼트 수익';
+  if (el('report-label-pub')) el('report-label-pub').textContent = prefix + ' 제작사 정산';
+  if (el('report-label-urban')) el('report-label-urban').textContent = prefix + ' 어반플레이 정산';
+
   renderReportStats(year);
   renderMonthlyChart(year);
   renderPublisherSummary(year);
