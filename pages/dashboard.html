@@ -44,6 +44,10 @@
             <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
             정산
           </a>
+          <a class="nav-item" data-page="schedule" onclick="navigateTo('schedule')">
+            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            스케줄
+          </a>
         </div>
 
         <div class="nav-section">
@@ -482,85 +486,45 @@
         <div class="page-header">
           <div>
             <h1>자료실</h1>
-            <div class="header-sub">회사 로고, 문서 양식, 공유 자료 다운로드</div>
+            <div class="header-sub">문서 양식, 회의록, 경영자료 링크 관리</div>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-primary btn-sm" onclick="openModal('resource-modal')">
+              + 자료 등록
+            </button>
           </div>
         </div>
         <div class="page-body">
-          <!-- CI / Logo -->
-          <div class="card" style="margin-bottom:24px;">
-            <div class="card-header">
-              <h3>회사 로고</h3>
-            </div>
-            <div class="card-body">
-              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:20px;">
-                <div style="text-align:center; padding:32px 20px; background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-md);">
-                  <div style="background:var(--gray-50); padding:24px; border-radius:var(--radius-sm); margin-bottom:16px;">
-                    <img src="../logo_black.png" alt="로고 (블랙)" style="height:40px;">
-                  </div>
-                  <div style="font-weight:600; font-size:14px; margin-bottom:4px;">로고 (블랙)</div>
-                  <div style="font-size:12px; color:var(--gray-400); margin-bottom:12px;">밝은 배경용 PNG</div>
-                  <a href="../logo_black.png" download="goodsmoment_logo_black.png" class="btn btn-secondary btn-sm">다운로드</a>
-                </div>
-                <div style="text-align:center; padding:32px 20px; background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-md);">
-                  <div style="background:var(--gray-900); padding:24px; border-radius:var(--radius-sm); margin-bottom:16px;">
-                    <img src="../logo_white.png" alt="로고 (화이트)" style="height:40px;">
-                  </div>
-                  <div style="font-weight:600; font-size:14px; margin-bottom:4px;">로고 (화이트)</div>
-                  <div style="font-size:12px; color:var(--gray-400); margin-bottom:12px;">어두운 배경용 PNG</div>
-                  <a href="../logo_white.png" download="goodsmoment_logo_white.png" class="btn btn-secondary btn-sm">다운로드</a>
-                </div>
-              </div>
-            </div>
+          <!-- 카테고리 탭 -->
+          <div style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-sm resource-tab" data-category="전체" onclick="filterResources('전체', this)" style="background:var(--primary); color:white;">전체</button>
+            <button class="btn btn-ghost btn-sm resource-tab" data-category="양식" onclick="filterResources('양식', this)">양식</button>
+            <button class="btn btn-ghost btn-sm resource-tab" data-category="회의록" onclick="filterResources('회의록', this)">회의록</button>
+            <button class="btn btn-ghost btn-sm resource-tab" data-category="경영자료" onclick="filterResources('경영자료', this)">경영자료</button>
+            <button class="btn btn-ghost btn-sm resource-tab" data-category="기타" onclick="filterResources('기타', this)">기타</button>
           </div>
 
-          <!-- 문서 양식 -->
-          <div class="card" style="margin-bottom:24px;">
-            <div class="card-header">
-              <h3>문서 양식</h3>
-              <span style="font-size:12px; color:var(--gray-400);">클릭하여 다운로드</span>
-            </div>
-            <div class="card-body" style="padding:0;">
-              <div id="template-list">
-                <div class="notice-item" onclick="downloadTemplate('meeting')">
-                  <div>
-                    <span class="notice-tag" style="background:var(--blue); color:white;">DOC</span>
-                    <span class="notice-title">회의록 양식</span>
-                  </div>
-                  <div class="notice-meta">날짜/참석자/안건/결정사항/후속조치</div>
-                </div>
-                <div class="notice-item" onclick="downloadTemplate('expense')">
-                  <div>
-                    <span class="notice-tag" style="background:var(--green); color:white;">XLS</span>
-                    <span class="notice-title">지출결의서</span>
-                  </div>
-                  <div class="notice-meta">프로젝트별 지출 결의서 양식</div>
-                </div>
-                <div class="notice-item" onclick="downloadTemplate('contract')">
-                  <div>
-                    <span class="notice-tag" style="background:var(--gray-700); color:white;">DOC</span>
-                    <span class="notice-title">계약서 기본 양식</span>
-                  </div>
-                  <div class="notice-meta">입점/위탁 관련 기본 계약서</div>
-                </div>
-                <div class="notice-item" onclick="downloadTemplate('inventory')">
-                  <div>
-                    <span class="notice-tag" style="background:var(--yellow); color:var(--black);">XLS</span>
-                    <span class="notice-title">재고 관리 양식</span>
-                  </div>
-                  <div class="notice-meta">상품 입출고/재고 현황 기록용</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 공유 링크 -->
+          <!-- 문서 목록 -->
           <div class="card">
             <div class="card-header">
-              <h3>공유 자료</h3>
-              <span style="font-size:12px; color:var(--gray-400);">팀 공유 링크 및 문서</span>
+              <h3>문서 목록</h3>
+              <span style="font-size:12px; color:var(--gray-400);" id="resource-count">0건</span>
             </div>
-            <div class="card-body">
-              <div class="empty-state"><p>등록된 공유 자료가 없습니다.</p></div>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>제목</th>
+                    <th>카테고리</th>
+                    <th>등록일</th>
+                    <th>링크</th>
+                    <th>삭제</th>
+                  </tr>
+                </thead>
+                <tbody id="resource-list">
+                  <tr><td colspan="5" class="empty-state">등록된 자료가 없습니다.</td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -612,6 +576,47 @@
                 </thead>
                 <tbody id="members-list">
                   <tr><td colspan="6" class="empty-state">팀원 정보를 불러오는 중...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SCHEDULE (근무 스케줄) ===== -->
+      <div id="section-schedule" class="page-section" style="display:none;">
+        <div class="page-header">
+          <div>
+            <h1>근무 스케줄</h1>
+            <div class="header-sub">월별 매장 근무 배정표</div>
+          </div>
+          <div class="header-actions">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <button class="btn btn-ghost btn-sm" onclick="prevMonth()" style="padding:6px 12px; font-size:18px;">&lt;</button>
+              <span id="schedule-month-label" style="font-size:16px; font-weight:700; min-width:140px; text-align:center;">2026년 04월</span>
+              <button class="btn btn-ghost btn-sm" onclick="nextMonth()" style="padding:6px 12px; font-size:18px;">&gt;</button>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openScheduleModal()">
+              + 스케줄 등록
+            </button>
+          </div>
+        </div>
+        <div class="page-body">
+          <div class="card">
+            <div class="table-container" style="overflow-x:auto;">
+              <table id="schedule-calendar" style="table-layout:fixed; width:100%;">
+                <thead>
+                  <tr>
+                    <th style="width:14.28%; text-align:center; color:var(--red);">일</th>
+                    <th style="width:14.28%; text-align:center;">월</th>
+                    <th style="width:14.28%; text-align:center;">화</th>
+                    <th style="width:14.28%; text-align:center; color:var(--red);">수</th>
+                    <th style="width:14.28%; text-align:center;">목</th>
+                    <th style="width:14.28%; text-align:center;">금</th>
+                    <th style="width:14.28%; text-align:center; color:var(--blue);">토</th>
+                  </tr>
+                </thead>
+                <tbody id="schedule-calendar-body">
                 </tbody>
               </table>
             </div>
@@ -912,6 +917,101 @@
       <div class="modal-body">
         <div id="view-notice-meta" style="font-size:12px; color:var(--gray-400); margin-bottom:16px;"></div>
         <div id="view-notice-content" style="white-space:pre-wrap; line-height:1.8;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Schedule Modal -->
+  <div class="modal-overlay" id="schedule-modal">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-header">
+        <h3>스케줄 등록</h3>
+        <button class="modal-close" onclick="closeModal('schedule-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>날짜</label>
+          <input type="date" id="schedule-date" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+        </div>
+        <div class="form-group">
+          <label>직원 선택</label>
+          <select id="schedule-user" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+            <option value="">선택하세요</option>
+          </select>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>시작 시간</label>
+            <input type="time" id="schedule-start" value="12:00" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+          </div>
+          <div class="form-group">
+            <label>종료 시간</label>
+            <input type="time" id="schedule-end" value="20:00" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>담당 층</label>
+            <select id="schedule-floor" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+              <option value="전체">전체</option>
+              <option value="1층">1층</option>
+              <option value="2층">2층</option>
+              <option value="3층">3층</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>휴게시간</label>
+            <select id="schedule-break" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+              <option value="30">30분</option>
+              <option value="60" selected>1시간</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>메모</label>
+          <textarea id="schedule-memo" placeholder="메모 (선택)" style="height:60px;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="closeModal('schedule-modal')">취소</button>
+        <button class="btn btn-primary btn-sm" onclick="saveScheduleEntry()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resource Modal -->
+  <div class="modal-overlay" id="resource-modal">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-header">
+        <h3>자료 등록</h3>
+        <button class="modal-close" onclick="closeModal('resource-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>제목</label>
+          <input type="text" id="resource-title" placeholder="자료 제목">
+        </div>
+        <div class="form-group">
+          <label>카테고리</label>
+          <select id="resource-category" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+            <option value="양식">양식</option>
+            <option value="회의록">회의록</option>
+            <option value="경영자료">경영자료</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>URL (Google Drive 등)</label>
+          <input type="url" id="resource-url" placeholder="https://drive.google.com/...">
+        </div>
+        <div class="form-group">
+          <label>메모</label>
+          <textarea id="resource-memo" placeholder="메모 (선택)" style="height:60px;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="closeModal('resource-modal')">취소</button>
+        <button class="btn btn-primary btn-sm" onclick="saveResource()">등록</button>
       </div>
     </div>
   </div>

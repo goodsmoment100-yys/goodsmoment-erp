@@ -514,7 +514,8 @@ function navigateTo(page) {
     case 'approval': loadApprovals(); break;
     case 'settlement': loadSettlements(); break;
     case 'notice': loadNotices(); break;
-    case 'resources': break;
+    case 'resources': loadResources(); break;
+    case 'schedule': loadSchedule(); break;
     case 'admin': loadMembers(); break;
     case 'hr': loadHRList(); break;
   }
@@ -893,6 +894,302 @@ async function openHRModal(userId) {
   }
 
   openModal('hr-modal');
+}
+
+// ============================================
+// Schedule (근무 스케줄)
+// ============================================
+
+let scheduleYear = new Date().getFullYear();
+let scheduleMonth = new Date().getMonth(); // 0-indexed
+
+function getScheduleStore() {
+  try {
+    return JSON.parse(localStorage.getItem('gm_schedule') || '{}');
+  } catch (e) {
+    return {};
+  }
+}
+
+function setScheduleStore(data) {
+  localStorage.setItem('gm_schedule', JSON.stringify(data));
+}
+
+function loadSchedule() {
+  renderCalendar(scheduleYear, scheduleMonth);
+}
+
+function prevMonth() {
+  scheduleMonth--;
+  if (scheduleMonth < 0) { scheduleMonth = 11; scheduleYear--; }
+  renderCalendar(scheduleYear, scheduleMonth);
+}
+
+function nextMonth() {
+  scheduleMonth++;
+  if (scheduleMonth > 11) { scheduleMonth = 0; scheduleYear++; }
+  renderCalendar(scheduleYear, scheduleMonth);
+}
+
+function renderCalendar(year, month) {
+  const label = document.getElementById('schedule-month-label');
+  if (label) label.textContent = `${year}년 ${String(month + 1).padStart(2, '0')}월`;
+
+  const tbody = document.getElementById('schedule-calendar-body');
+  if (!tbody) return;
+
+  const store = getScheduleStore();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+
+  const badgeColors = ['#0d9488', '#6366f1', '#ec4899', '#f59e0b', '#8b5cf6', '#06b6d4', '#ef4444', '#84cc16'];
+
+  let html = '';
+  let dayCount = 1;
+  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+
+  for (let i = 0; i < totalCells; i++) {
+    if (i % 7 === 0) html += '<tr>';
+
+    if (i < firstDay || dayCount > daysInMonth) {
+      html += '<td style="padding:8px; vertical-align:top; min-height:80px; height:90px; background:var(--gray-50);"></td>';
+    } else {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayCount).padStart(2, '0')}`;
+      const isToday = dateStr === todayStr;
+      const dayOfWeek = new Date(year, month, dayCount).getDay();
+      const isWednesday = dayOfWeek === 3;
+      const isSunday = dayOfWeek === 0;
+
+      let cellStyle = 'padding:8px; vertical-align:top; min-height:80px; height:90px; cursor:pointer; transition:background 0.15s;';
+      if (isToday) cellStyle += ' border:2px solid var(--primary); background:rgba(13,148,136,0.04);';
+      if (isWednesday) cellStyle += ' background:rgba(239,68,68,0.04);';
+
+      const entries = store[dateStr] || [];
+      let badgesHtml = '';
+
+      if (isWednesday) {
+        badgesHtml += '<span style="display:inline-block; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:700; background:#fecaca; color:#dc2626; margin-top:4px;">휴무</span><br>';
+      }
+
+      entries.forEach((entry, idx) => {
+        const color = badgeColors[idx % badgeColors.length];
+        badgesHtml += `<span style="display:inline-block; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; background:${color}20; color:${color}; margin-top:2px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${entry.name} ${entry.startTime}~${entry.endTime} ${entry.floor}">${entry.name}</span><br>`;
+      });
+
+      const dateColor = isSunday ? 'var(--red)' : (dayOfWeek === 6 ? 'var(--blue)' : 'var(--gray-700)');
+
+      html += `<td style="${cellStyle}" onclick="openScheduleModal('${dateStr}')">
+        <div style="font-size:13px; font-weight:700; color:${dateColor}; margin-bottom:2px;">${dayCount}</div>
+        <div style="line-height:1.4;">${badgesHtml}</div>
+      </td>`;
+      dayCount++;
+    }
+
+    if (i % 7 === 6) html += '</tr>';
+  }
+
+  tbody.innerHTML = html;
+}
+
+async function openScheduleModal(dateStr) {
+  // Populate user dropdown from profiles
+  const userSelect = document.getElementById('schedule-user');
+  if (userSelect && userSelect.options.length <= 1) {
+    try {
+      const { data: members } = await sb.from('profiles').select('id, name, department').order('name');
+      if (members) {
+        userSelect.innerHTML = '<option value="">선택하세요</option>' +
+          members.map(m => `<option value="${m.id}" data-name="${m.name}">${m.name} (${m.department || '미지정'})</option>`).join('');
+      }
+    } catch (e) {
+      // If Supabase fails, keep existing options
+    }
+  }
+
+  if (dateStr) {
+    document.getElementById('schedule-date').value = dateStr;
+  } else {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('schedule-date').value = today;
+  }
+
+  document.getElementById('schedule-start').value = '12:00';
+  document.getElementById('schedule-end').value = '20:00';
+  document.getElementById('schedule-floor').value = '전체';
+  document.getElementById('schedule-break').value = '60';
+  document.getElementById('schedule-memo').value = '';
+  if (userSelect) userSelect.value = '';
+
+  openModal('schedule-modal');
+}
+
+function saveScheduleEntry() {
+  const dateStr = document.getElementById('schedule-date').value;
+  const userSelect = document.getElementById('schedule-user');
+  const userId = userSelect.value;
+  const selectedOption = userSelect.options[userSelect.selectedIndex];
+  const userName = selectedOption ? selectedOption.getAttribute('data-name') : '';
+  const startTime = document.getElementById('schedule-start').value;
+  const endTime = document.getElementById('schedule-end').value;
+  const floor = document.getElementById('schedule-floor').value;
+  const breakMin = parseInt(document.getElementById('schedule-break').value);
+  const memo = document.getElementById('schedule-memo').value.trim();
+
+  if (!dateStr) { showToast('날짜를 선택해주세요.', 'error'); return; }
+  if (!userId) { showToast('직원을 선택해주세요.', 'error'); return; }
+  if (!startTime || !endTime) { showToast('근무시간을 입력해주세요.', 'error'); return; }
+
+  const store = getScheduleStore();
+  if (!store[dateStr]) store[dateStr] = [];
+
+  store[dateStr].push({
+    userId: userId,
+    name: userName,
+    startTime: startTime,
+    endTime: endTime,
+    floor: floor,
+    breakMin: breakMin,
+    memo: memo
+  });
+
+  setScheduleStore(store);
+  closeModal('schedule-modal');
+  showToast('스케줄이 등록되었습니다.', 'success');
+  renderCalendar(scheduleYear, scheduleMonth);
+}
+
+function deleteScheduleEntry(dateStr, index) {
+  if (!confirm('이 스케줄을 삭제하시겠습니까?')) return;
+  const store = getScheduleStore();
+  if (store[dateStr]) {
+    store[dateStr].splice(index, 1);
+    if (store[dateStr].length === 0) delete store[dateStr];
+    setScheduleStore(store);
+    showToast('스케줄이 삭제되었습니다.', 'success');
+    renderCalendar(scheduleYear, scheduleMonth);
+  }
+}
+
+// ============================================
+// Resources (자료실)
+// ============================================
+
+let currentResourceFilter = '전체';
+
+function getResourceStore() {
+  try {
+    const data = JSON.parse(localStorage.getItem('gm_resources') || 'null');
+    if (data) return data;
+  } catch (e) {}
+
+  // Default entries
+  const defaults = [
+    { title: '회의록 양식', category: '양식', url: '', memo: '', date: '2026-04-01' },
+    { title: '연차사용현황', category: '양식', url: '', memo: '', date: '2026-04-01' },
+    { title: '입고확인증', category: '양식', url: '', memo: '', date: '2026-04-01' },
+    { title: '출고확인증', category: '양식', url: '', memo: '', date: '2026-04-01' },
+    { title: '발주서', category: '양식', url: '', memo: '', date: '2026-04-01' },
+    { title: '2026 일정&업무 요약', category: '경영자료', url: '', memo: '', date: '2026-04-01' }
+  ];
+  localStorage.setItem('gm_resources', JSON.stringify(defaults));
+  return defaults;
+}
+
+function setResourceStore(data) {
+  localStorage.setItem('gm_resources', JSON.stringify(data));
+}
+
+function loadResources() {
+  renderResources();
+}
+
+function filterResources(category, btnEl) {
+  currentResourceFilter = category;
+  document.querySelectorAll('.resource-tab').forEach(el => {
+    el.style.background = 'transparent';
+    el.style.color = 'var(--gray-600)';
+  });
+  if (btnEl) {
+    btnEl.style.background = 'var(--primary)';
+    btnEl.style.color = 'white';
+  }
+  renderResources();
+}
+
+function renderResources() {
+  const store = getResourceStore();
+  const tbody = document.getElementById('resource-list');
+  const countEl = document.getElementById('resource-count');
+  if (!tbody) return;
+
+  const filtered = currentResourceFilter === '전체' ? store : store.filter(r => r.category === currentResourceFilter);
+
+  if (countEl) countEl.textContent = filtered.length + '건';
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">등록된 자료가 없습니다.</td></tr>';
+    return;
+  }
+
+  const categoryColors = {
+    '양식': 'var(--blue)',
+    '회의록': 'var(--green)',
+    '경영자료': 'var(--yellow)',
+    '기타': 'var(--gray-500)'
+  };
+
+  tbody.innerHTML = filtered.map((r, idx) => {
+    const realIdx = store.indexOf(r);
+    const color = categoryColors[r.category] || 'var(--gray-500)';
+    const linkHtml = r.url
+      ? `<a href="${r.url}" target="_blank" style="color:var(--primary); text-decoration:none; font-size:13px;">열기</a>`
+      : '<span style="font-size:12px; color:var(--gray-400);">미등록</span>';
+
+    return `<tr>
+      <td><strong>${r.title}</strong>${r.memo ? '<br><span style="font-size:11px; color:var(--gray-400);">' + r.memo + '</span>' : ''}</td>
+      <td><span style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; background:${color}15; color:${color};">${r.category}</span></td>
+      <td style="font-size:13px; color:var(--gray-500);">${r.date || '-'}</td>
+      <td>${linkHtml}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="deleteResource(${realIdx})" style="color:var(--red); font-size:12px;">삭제</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function saveResource() {
+  const title = document.getElementById('resource-title').value.trim();
+  const category = document.getElementById('resource-category').value;
+  const url = document.getElementById('resource-url').value.trim();
+  const memo = document.getElementById('resource-memo').value.trim();
+
+  if (!title) { showToast('제목을 입력해주세요.', 'error'); return; }
+
+  const store = getResourceStore();
+  store.push({
+    title: title,
+    category: category,
+    url: url,
+    memo: memo,
+    date: new Date().toISOString().split('T')[0]
+  });
+  setResourceStore(store);
+
+  closeModal('resource-modal');
+  document.getElementById('resource-title').value = '';
+  document.getElementById('resource-url').value = '';
+  document.getElementById('resource-memo').value = '';
+  showToast('자료가 등록되었습니다.', 'success');
+  renderResources();
+}
+
+function deleteResource(index) {
+  if (!confirm('이 자료를 삭제하시겠습니까?')) return;
+  const store = getResourceStore();
+  store.splice(index, 1);
+  setResourceStore(store);
+  showToast('자료가 삭제되었습니다.', 'success');
+  renderResources();
 }
 
 // Save HR data
