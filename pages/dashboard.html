@@ -10,6 +10,8 @@
   <div id="toast-container" class="toast-container"></div>
 
   <div class="app-layout">
+    <button class="mobile-menu-btn" onclick="toggleMobileMenu()" id="mobile-menu-btn">&#9776;</button>
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleMobileMenu()"></div>
     <!-- ===== SIDEBAR ===== -->
     <aside class="sidebar">
       <div class="sidebar-logo">
@@ -64,6 +66,10 @@
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             공지사항
           </a>
+          <a class="nav-item" data-page="messages" onclick="navigateTo('messages')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            메시지
+          </a>
           <a class="nav-item" data-page="resources" onclick="navigateTo('resources')">
             <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
             자료실
@@ -110,73 +116,120 @@
         <div class="page-header">
           <div>
             <h1>대시보드</h1>
-            <div class="header-sub">굿즈모먼트 내부 관리 시스템</div>
+            <div class="header-sub" id="dash-date-display"></div>
           </div>
         </div>
         <div class="page-body">
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-icon red">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              </div>
-              <div class="stat-value" id="stat-attendance">-</div>
-              <div class="stat-label">오늘 출근</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon yellow">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-              </div>
-              <div class="stat-value" id="stat-pending">-</div>
-              <div class="stat-label">대기중 결재</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon green">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-              </div>
-              <div class="stat-value" id="stat-expense">-</div>
-              <div class="stat-label">이번 달 지출</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon blue">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              </div>
-              <div class="stat-value" id="stat-notices">-</div>
-              <div class="stat-label">공지사항</div>
-            </div>
-          </div>
 
-          <div class="grid-2">
-            <!-- Quick Attendance -->
-            <div class="card">
-              <div class="card-header">
-                <h3>빠른 출퇴근</h3>
-              </div>
-              <div class="card-body">
-                <div style="text-align:center; padding: 16px 0;">
-                  <div id="dashboard-time" style="font-size:32px; font-weight:800; color:var(--black); font-variant-numeric:tabular-nums;"></div>
-                  <div id="dashboard-date" style="font-size:13px; color:var(--gray-500); margin-top:4px; margin-bottom:20px;"></div>
-                  <div id="dashboard-attendance-status" class="attendance-status" style="margin-bottom:16px;"></div>
-                  <div style="display:flex; gap:12px; justify-content:center;">
-                    <button class="btn-clock-in" id="dash-btn-in" onclick="clockIn().then(()=>{updateDashAttendance();loadDashboardStats();})" style="padding:12px 32px; font-size:14px;">출근</button>
-                    <button class="btn-clock-out" id="dash-btn-out" onclick="clockOut().then(()=>{updateDashAttendance();loadDashboardStats();})" style="padding:12px 32px; font-size:14px;">퇴근</button>
-                  </div>
+          <!-- ROW 1: 오늘 내 근무 + 출퇴근 버튼 -->
+          <div class="card" style="margin-bottom:16px; border-left: 4px solid var(--primary);">
+            <div class="card-body" style="padding:16px 20px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                <div>
+                  <div style="font-size:12px; color:var(--gray-500); font-weight:600; text-transform:uppercase; letter-spacing:1px;">오늘 내 근무</div>
+                  <div id="dash-my-schedule" style="font-size:18px; font-weight:700; margin-top:4px;">로딩중...</div>
+                  <div id="dash-my-time" style="font-size:13px; color:var(--gray-500); margin-top:2px;"></div>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <span id="dash-work-status" class="status-badge off">미출근</span>
+                  <div id="dash-clock" style="font-size:24px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--black);"></div>
+                </div>
+                <div style="display:flex; gap:8px;">
+                  <button class="btn btn-primary btn-sm" id="dash-btn-in" onclick="clockIn().then(()=>loadDashboard())">출근</button>
+                  <button class="btn btn-sm" id="dash-btn-break-s" onclick="breakStart().then(()=>loadDashboard())" disabled style="background:var(--yellow); color:var(--black); border:none; cursor:pointer; padding:8px 16px; border-radius:8px; font-weight:600; font-family:inherit;">휴게시작</button>
+                  <button class="btn btn-sm" id="dash-btn-break-e" onclick="breakEnd().then(()=>loadDashboard())" disabled style="background:#FF9500; color:white; border:none; cursor:pointer; padding:8px 16px; border-radius:8px; font-weight:600; font-family:inherit;">휴게종료</button>
+                  <button class="btn btn-secondary btn-sm" id="dash-btn-out" onclick="clockOut().then(()=>loadDashboard())" disabled>퇴근</button>
                 </div>
               </div>
             </div>
+          </div>
 
-            <!-- Recent Notices -->
+          <!-- ROW 2: 오늘 매장 현황 (층별 누가 있는지) -->
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-body" style="padding:16px 20px;">
+              <div style="font-size:12px; color:var(--gray-500); font-weight:600; margin-bottom:8px;">오늘 매장 현황</div>
+              <div id="dash-floor-status" style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px;">
+                <div style="background:var(--gray-50); padding:10px; border-radius:8px; text-align:center;">
+                  <div style="font-size:11px; color:var(--gray-500);">1층</div>
+                  <div style="font-size:14px; font-weight:700;" id="dash-floor-1">-</div>
+                </div>
+                <div style="background:var(--gray-50); padding:10px; border-radius:8px; text-align:center;">
+                  <div style="font-size:11px; color:var(--gray-500);">2층</div>
+                  <div style="font-size:14px; font-weight:700;" id="dash-floor-2">-</div>
+                </div>
+                <div style="background:var(--gray-50); padding:10px; border-radius:8px; text-align:center;">
+                  <div style="font-size:11px; color:var(--gray-500);">3층</div>
+                  <div style="font-size:14px; font-weight:700;" id="dash-floor-3">-</div>
+                </div>
+                <div style="background:var(--gray-50); padding:10px; border-radius:8px; text-align:center;">
+                  <div style="font-size:11px; color:var(--gray-500);">4층(팝업)</div>
+                  <div style="font-size:14px; font-weight:700;" id="dash-floor-4">-</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ROW 3: 이번 주 내 스케줄 -->
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-body" style="padding:16px 20px;">
+              <div style="font-size:12px; color:var(--gray-500); font-weight:600; margin-bottom:8px;">이번 주 내 스케줄</div>
+              <div id="dash-week-schedule" style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center;">
+              </div>
+            </div>
+          </div>
+
+          <!-- ROW 4: 숫자 요약 (compact) -->
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px;">
+            <div class="card" style="border:none; box-shadow:none; background:var(--primary-bg);">
+              <div class="card-body" style="padding:12px; text-align:center;">
+                <div style="font-size:20px; font-weight:800; color:var(--primary);" id="dash-month-days">-</div>
+                <div style="font-size:11px; color:var(--gray-500);">이번달 근무일</div>
+              </div>
+            </div>
+            <div class="card" style="border:none; box-shadow:none; background:var(--blue-bg);">
+              <div class="card-body" style="padding:12px; text-align:center;">
+                <div style="font-size:20px; font-weight:800; color:var(--blue);" id="dash-month-hours">-</div>
+                <div style="font-size:11px; color:var(--gray-500);">총 근무시간</div>
+              </div>
+            </div>
+            <div class="card" style="border:none; box-shadow:none; background:var(--yellow-bg);">
+              <div class="card-body" style="padding:12px; text-align:center;">
+                <div style="font-size:20px; font-weight:800; color:#B8860B;" id="dash-pending-approvals">-</div>
+                <div style="font-size:11px; color:var(--gray-500);">결재 대기</div>
+              </div>
+            </div>
+            <div class="card" style="border:none; box-shadow:none; background:var(--green-bg);">
+              <div class="card-body" style="padding:12px; text-align:center;">
+                <div style="font-size:20px; font-weight:800; color:var(--green);" id="dash-notices-count">-</div>
+                <div style="font-size:11px; color:var(--gray-500);">새 공지</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ROW 5: 최근 공지 + 이번 주 일정 -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
             <div class="card">
-              <div class="card-header">
-                <h3>최근 공지</h3>
-                <a class="btn btn-ghost btn-sm" onclick="navigateTo('notice')">전체보기</a>
+              <div class="card-header" style="padding:12px 16px;">
+                <h3 style="font-size:14px;">최근 공지</h3>
+                <a class="btn btn-ghost btn-sm" onclick="navigateTo('notice')" style="font-size:12px;">전체</a>
               </div>
               <div class="card-body" style="padding:0;">
-                <div id="dashboard-notices" class="notice-list">
-                  <div class="empty-state"><p>공지사항이 없습니다.</p></div>
+                <div id="dash-notices" class="notice-list" style="max-height:160px; overflow-y:auto;">
+                  <div class="empty-state" style="padding:20px;"><p style="font-size:13px;">공지 없음</p></div>
                 </div>
               </div>
             </div>
+            <div class="card">
+              <div class="card-header" style="padding:12px 16px;">
+                <h3 style="font-size:14px;">이번 주 일정</h3>
+                <a class="btn btn-ghost btn-sm" onclick="navigateTo('calendar')" style="font-size:12px;">전체</a>
+              </div>
+              <div class="card-body" style="padding:8px 16px; max-height:160px; overflow-y:auto;">
+                <div id="dash-week-events" style="font-size:13px; color:var(--gray-600);">일정 없음</div>
+              </div>
+            </div>
           </div>
+
         </div>
       </div>
 
@@ -488,6 +541,28 @@
           <div class="card">
             <div id="notice-list" class="notice-list">
               <div class="empty-state"><p>등록된 공지사항이 없습니다.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== MESSAGES (메시지) ===== -->
+      <div id="section-messages" class="page-section" style="display:none;">
+        <div class="page-header">
+          <div>
+            <h1>메시지</h1>
+            <div class="header-sub">직원 간 메시지</div>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-primary btn-sm" onclick="openMessageModal()">
+              + 새 메시지
+            </button>
+          </div>
+        </div>
+        <div class="page-body">
+          <div class="card">
+            <div class="card-body" id="message-list" style="min-height:200px;">
+              <div class="empty-state"><p>메시지가 없습니다.</p></div>
             </div>
           </div>
         </div>
@@ -1479,6 +1554,32 @@
     </div>
   </div>
 
+  <!-- Message Modal -->
+  <div class="modal-overlay" id="message-modal">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-header">
+        <h3>새 메시지</h3>
+        <button class="modal-close" onclick="closeModal('message-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>받는 사람</label>
+          <select id="message-to" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+            <option value="all">전체</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>내용</label>
+          <textarea id="message-content" placeholder="메시지를 입력하세요" style="min-height:120px;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="closeModal('message-modal')">취소</button>
+        <button class="btn btn-primary btn-sm" onclick="sendMessage()">보내기</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Calendar Modal -->
   <div class="modal-overlay" id="calendar-modal">
     <div class="modal" style="max-width:560px;">
@@ -1568,92 +1669,212 @@
       await initSidebar();
       navigateTo('dashboard');
 
-      // Start clock
+      // Start clocks
       updateClock();
       setInterval(updateClock, 1000);
-
-      // Dashboard clock
       updateDashClock();
       setInterval(updateDashClock, 1000);
-
-      // Dashboard attendance
-      updateDashAttendance();
-
-      // Load dashboard notices
-      loadDashNotices();
     })();
 
     function updateDashClock() {
-      const el = document.getElementById('dashboard-time');
-      const dateEl = document.getElementById('dashboard-date');
+      const el = document.getElementById('dash-clock');
+      const dateEl = document.getElementById('dash-date-display');
       if (!el) return;
       const now = new Date();
       el.textContent = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-      if (dateEl) dateEl.textContent = now.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+      if (dateEl) dateEl.textContent = now.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
     }
 
-    async function updateDashAttendance() {
+    async function loadDashboard() {
       const user = await getCurrentUser();
-      if (!user) return;
-      const today = new Date().toISOString().split('T')[0];
-      const { data } = await sb
-        .from('attendance')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('date', today)
-        .single();
+      if (!user || !user.profile) return;
+      const userName = user.profile.name;
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      const dayOfWeek = today.getDay(); // 0=Sun
 
-      const btnIn = document.getElementById('dash-btn-in');
-      const btnOut = document.getElementById('dash-btn-out');
-      const statusEl = document.getElementById('dashboard-attendance-status');
+      // --- 1. Today's schedule for current user ---
+      const schedData = getScheduleStore();
+      const todayEntries = schedData[todayStr] || [];
+      const myEntry = todayEntries.find(e => {
+        if (!e.name) return false;
+        const clean = e.name.replace(/[MPT]/g, '');
+        return userName === e.name || userName.includes(clean) || e.name.includes(userName) || clean.includes(userName);
+      });
 
-      const canSeeTime = isManager(user);
+      const schedEl = document.getElementById('dash-my-schedule');
+      const timeEl = document.getElementById('dash-my-time');
 
-      if (data && data.clock_in && !data.clock_out) {
-        btnIn.disabled = true; btnOut.disabled = false;
-        if (canSeeTime) {
-          const t = new Date(data.clock_in).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-          if (statusEl) statusEl.innerHTML = `<span class="status-badge working">근무중</span> ${t} 출근`;
-        } else {
-          if (statusEl) statusEl.innerHTML = `<span class="status-badge working">근무중</span>`;
-        }
-      } else if (data && data.clock_out) {
-        btnIn.disabled = true; btnOut.disabled = true;
-        if (canSeeTime) {
-          if (statusEl) statusEl.innerHTML = `<span class="status-badge done">퇴근완료</span> ${data.work_hours}시간 근무`;
-        } else {
-          if (statusEl) statusEl.innerHTML = `<span class="status-badge done">퇴근완료</span>`;
+      if (dayOfWeek === 3) {
+        schedEl.textContent = '수요일 정기휴무';
+        schedEl.style.color = 'var(--red)';
+        timeEl.textContent = '매장 휴무일';
+      } else if (myEntry) {
+        schedEl.textContent = myEntry.floor + ' 근무';
+        schedEl.style.color = 'var(--black)';
+        timeEl.textContent = myEntry.startTime + ' ~ ' + myEntry.endTime + ' (휴게 ' + myEntry.breakMin + '분)';
+      } else {
+        schedEl.textContent = '오늘 스케줄 없음';
+        schedEl.style.color = 'var(--gray-400)';
+        timeEl.textContent = '';
+      }
+
+      // --- 2. Floor status (who's on each floor today) ---
+      const floors = { 1: [], 2: [], 3: [], 4: [] };
+      if (dayOfWeek === 3) {
+        for (let f = 1; f <= 4; f++) {
+          const el = document.getElementById('dash-floor-' + f);
+          if (el) { el.textContent = '휴무'; el.style.color = 'var(--red)'; el.style.fontSize = '13px'; }
         }
       } else {
-        btnIn.disabled = false; btnOut.disabled = true;
-        if (statusEl) statusEl.innerHTML = `<span class="status-badge off">미출근</span>`;
+        todayEntries.forEach(e => {
+          const shortName = e.name ? e.name.replace(/[MPT]/g, '') : e.name;
+          if (e.floor === '전체') {
+            [1,2,3,4].forEach(f => floors[f].push(shortName));
+          } else {
+            const fNum = parseInt(e.floor);
+            if (fNum >= 1 && fNum <= 4) floors[fNum].push(shortName);
+          }
+        });
+        for (let f = 1; f <= 4; f++) {
+          const el = document.getElementById('dash-floor-' + f);
+          if (el) {
+            el.textContent = floors[f].length > 0 ? floors[f].join(', ') : '-';
+            el.style.color = floors[f].length > 0 ? 'var(--black)' : 'var(--gray-400)';
+            el.style.fontSize = floors[f].length > 2 ? '12px' : '14px';
+          }
+        }
       }
-    }
 
-    async function loadDashNotices() {
-      const { data } = await sb
-        .from('notices')
-        .select('*, profiles(name)')
-        .order('created_at', { ascending: false })
-        .limit(5);
+      // --- 3. This week's schedule (Mon-Sun) ---
+      const weekEl = document.getElementById('dash-week-schedule');
+      const mon = new Date(today);
+      const dayIdx = today.getDay() === 0 ? 6 : today.getDay() - 1;
+      mon.setDate(today.getDate() - dayIdx);
 
-      const list = document.getElementById('dashboard-notices');
-      if (!list) return;
+      if (weekEl) {
+        const dayNames = ['월','화','수','목','금','토','일'];
+        let html = '';
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(mon);
+          d.setDate(mon.getDate() + i);
+          const dStr = d.toISOString().split('T')[0];
+          const isToday = dStr === todayStr;
+          const isWed = d.getDay() === 3;
+          const entries = schedData[dStr] || [];
+          const myDayEntry = entries.find(e => {
+            if (!e.name) return false;
+            const clean = e.name.replace(/[MPT]/g, '');
+            return userName === e.name || userName.includes(clean) || e.name.includes(userName) || clean.includes(userName);
+          });
 
-      if (!data || data.length === 0) {
-        list.innerHTML = '<div class="empty-state"><p>공지사항이 없습니다.</p></div>';
-        return;
+          let floorText = '-';
+          let floorColor = 'var(--gray-400)';
+          if (isWed) { floorText = '휴무'; floorColor = 'var(--red)'; }
+          else if (myDayEntry) { floorText = myDayEntry.floor; floorColor = 'var(--black)'; }
+
+          const borderStyle = isToday ? 'border:2px solid var(--primary);' : 'border:1px solid var(--gray-200);';
+          const bgStyle = isToday ? 'background:var(--primary-bg);' : '';
+          html += `<div style="padding:6px 2px; border-radius:6px; ${borderStyle} ${bgStyle}">
+            <div style="font-size:11px; color:${isToday ? 'var(--primary)' : 'var(--gray-500)'}; font-weight:${isToday ? '700' : '500'};">${dayNames[i]}</div>
+            <div style="font-size:12px; font-weight:700; color:${floorColor}; margin-top:2px;">${floorText}</div>
+          </div>`;
+        }
+        weekEl.innerHTML = html;
       }
 
-      list.innerHTML = data.map(n => {
-        const tagClass = n.tag === 'important' ? 'important' : n.tag === 'event' ? 'event' : 'general';
-        const tagText = n.tag === 'important' ? '중요' : n.tag === 'event' ? '행사' : '일반';
-        const date = new Date(n.created_at).toLocaleDateString('ko-KR');
-        return `<div class="notice-item" onclick="viewNotice('${n.id}')">
-          <div><span class="notice-tag ${tagClass}">${tagText}</span><span class="notice-title">${n.title}</span></div>
-          <div class="notice-meta">${n.profiles?.name || ''} · ${date}</div>
-        </div>`;
-      }).join('');
+      // --- 4. Attendance button states ---
+      const { data: attData } = await sb.from('attendance').select('*').eq('user_id', user.id).eq('date', todayStr).single();
+      const btnIn = document.getElementById('dash-btn-in');
+      const btnOut = document.getElementById('dash-btn-out');
+      const btnBreakS = document.getElementById('dash-btn-break-s');
+      const btnBreakE = document.getElementById('dash-btn-break-e');
+      const statusBadge = document.getElementById('dash-work-status');
+
+      if (btnIn) btnIn.disabled = true;
+      if (btnOut) btnOut.disabled = true;
+      if (btnBreakS) btnBreakS.disabled = true;
+      if (btnBreakE) btnBreakE.disabled = true;
+
+      if (!attData || !attData.clock_in) {
+        if (btnIn) btnIn.disabled = false;
+        if (statusBadge) { statusBadge.textContent = '미출근'; statusBadge.className = 'status-badge off'; statusBadge.style = ''; }
+      } else if (attData.status === 'break') {
+        if (btnBreakE) btnBreakE.disabled = false;
+        if (statusBadge) { statusBadge.textContent = '휴게중'; statusBadge.className = 'status-badge'; statusBadge.style.background = 'var(--yellow-bg)'; statusBadge.style.color = '#B8860B'; }
+      } else if (!attData.clock_out) {
+        if (btnOut) btnOut.disabled = false;
+        if (btnBreakS && !attData.break_start) btnBreakS.disabled = false;
+        if (statusBadge) { statusBadge.textContent = '근무중'; statusBadge.className = 'status-badge working'; statusBadge.style = ''; }
+      } else {
+        if (statusBadge) { statusBadge.textContent = '퇴근완료'; statusBadge.className = 'status-badge done'; statusBadge.style = ''; }
+      }
+
+      // --- 5. Dashboard stats ---
+      const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+      const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+      const { data: monthAtt } = await sb.from('attendance').select('date, work_hours').eq('user_id', user.id).gte('date', firstOfMonth).lte('date', lastOfMonth).not('clock_in', 'is', null);
+      const workDays = monthAtt ? monthAtt.length : 0;
+      const totalHours = monthAtt ? monthAtt.reduce((s, r) => s + (r.work_hours || 0), 0) : 0;
+
+      const _el = (id) => document.getElementById(id);
+      if (_el('dash-month-days')) _el('dash-month-days').textContent = workDays + '일';
+      if (_el('dash-month-hours')) _el('dash-month-hours').textContent = totalHours.toFixed(1) + 'h';
+
+      const { count: pendingCount } = await sb.from('approvals').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+      if (_el('dash-pending-approvals')) _el('dash-pending-approvals').textContent = pendingCount || 0;
+
+      const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
+      const { count: noticeCount } = await sb.from('notices').select('*', { count: 'exact', head: true }).gte('created_at', weekAgo.toISOString());
+      if (_el('dash-notices-count')) _el('dash-notices-count').textContent = noticeCount || 0;
+
+      // --- 6. Recent notices ---
+      const { data: notices } = await sb.from('notices').select('*, profiles(name)').order('created_at', { ascending: false }).limit(5);
+      const noticeList = document.getElementById('dash-notices');
+      if (noticeList) {
+        if (!notices || notices.length === 0) {
+          noticeList.innerHTML = '<div class="empty-state" style="padding:20px;"><p style="font-size:13px;">공지 없음</p></div>';
+        } else {
+          noticeList.innerHTML = notices.map(n => {
+            const tagClass = n.tag === 'important' ? 'important' : n.tag === 'event' ? 'event' : 'general';
+            const tagText = n.tag === 'important' ? '중요' : n.tag === 'event' ? '행사' : '일반';
+            const date = new Date(n.created_at).toLocaleDateString('ko-KR');
+            return `<div class="notice-item" onclick="viewNotice('${n.id}')">
+              <div><span class="notice-tag ${tagClass}">${tagText}</span><span class="notice-title">${n.title}</span></div>
+              <div class="notice-meta">${n.profiles?.name || ''} &middot; ${date}</div>
+            </div>`;
+          }).join('');
+        }
+      }
+
+      // --- 7. This week's calendar events ---
+      const eventsEl = document.getElementById('dash-week-events');
+      if (eventsEl) {
+        const calData = getCalendarStore();
+        const monStr = new Date(mon).toISOString().split('T')[0];
+        const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+        const sunStr = sun.toISOString().split('T')[0];
+
+        const weekEvents = (calData || []).filter(ev => {
+          const start = ev.startDate;
+          const end = ev.endDate || ev.startDate;
+          return start <= sunStr && end >= monStr;
+        });
+
+        if (weekEvents.length === 0) {
+          eventsEl.textContent = '일정 없음';
+        } else {
+          eventsEl.innerHTML = weekEvents.map(ev => {
+            const catLabel = (typeof calCategoryLabels !== 'undefined' ? calCategoryLabels[ev.category] : ev.category) || ev.category;
+            const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ev.color || 'var(--primary)'};margin-right:6px;"></span>`;
+            const timeStr = ev.time ? ' ' + ev.time : '';
+            return `<div style="padding:4px 0; border-bottom:1px solid var(--gray-100);">
+              ${dot}<span style="font-weight:600;">${ev.title}</span>
+              <span style="color:var(--gray-400); font-size:12px; margin-left:6px;">${catLabel}${timeStr}</span>
+            </div>`;
+          }).join('');
+        }
+      }
     }
 
     // Form submissions
