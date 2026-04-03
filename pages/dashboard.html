@@ -35,11 +35,11 @@
           </a>
           <a class="nav-item" data-page="schedule" onclick="navigateTo('schedule')">
             <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            스케줄
+            근무스케줄
           </a>
           <a class="nav-item" data-page="approval" onclick="navigateTo('approval')">
             <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-            결재
+            전자결재
             <span class="nav-badge" id="nav-badge-approval" style="display:none">0</span>
           </a>
         </div>
@@ -76,7 +76,7 @@
           </a>
           <a class="nav-item" data-page="accounts" onclick="navigateTo('accounts')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-            연락처
+            계정/연락처
           </a>
         </div>
 
@@ -93,6 +93,10 @@
           <a class="nav-item" data-page="admin" onclick="navigateTo('admin')">
             <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
             조직관리
+          </a>
+          <a class="nav-item" data-page="clients" onclick="navigateTo('clients')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+            거래처 관리
           </a>
         </div>
       </nav>
@@ -1355,6 +1359,106 @@
         </div>
       </div>
 
+      <!-- ===== CLIENTS (거래처 관리) ===== -->
+      <div id="section-clients" class="page-section" style="display:none;">
+        <div class="page-header">
+          <div>
+            <h1>거래처 관리</h1>
+            <div class="header-sub">제작사/파트너 계약 및 연락처</div>
+          </div>
+        </div>
+        <div class="page-body">
+          <!-- Tabs -->
+          <div style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-sm client-tab-btn" onclick="switchClientTab('list', this)" style="background:var(--primary); color:white;">제작사 목록</button>
+            <button class="btn btn-ghost btn-sm client-tab-btn" onclick="switchClientTab('contract', this)">계약 현황</button>
+          </div>
+
+          <!-- Tab 1: 제작사 목록 -->
+          <div id="clients-tab-list">
+            <div class="card">
+              <div class="card-header">
+                <h3>제작사 목록</h3>
+                <button class="btn btn-primary btn-sm" onclick="openClientModal()">+ 거래처 추가</button>
+              </div>
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>제작사명</th>
+                      <th>사업자번호</th>
+                      <th>계약상태</th>
+                      <th>수수료율</th>
+                      <th>정산일</th>
+                      <th>담당자</th>
+                      <th>이메일</th>
+                      <th>연락처</th>
+                      <th>비고</th>
+                    </tr>
+                  </thead>
+                  <tbody id="client-list">
+                    <tr><td colspan="9" class="empty-state">등록된 거래처가 없습니다.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: 계약 현황 -->
+          <div id="clients-tab-contract" style="display:none;">
+            <!-- Summary Stats -->
+            <div class="stats-grid" style="margin-bottom:24px;">
+              <div class="stat-card">
+                <div class="stat-icon blue">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+                </div>
+                <div class="stat-value" id="stat-total-clients">0</div>
+                <div class="stat-label">총 거래처 수</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon green">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                </div>
+                <div class="stat-value" id="stat-contracted-clients">0</div>
+                <div class="stat-label">계약완료</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon yellow">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <div class="stat-value" id="stat-negotiating-clients">0</div>
+                <div class="stat-label">협의중</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3>계약 현황</h3>
+              </div>
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>제작사명</th>
+                      <th>계약일자</th>
+                      <th>계약기간</th>
+                      <th>수수료</th>
+                      <th>정산자료 제공일</th>
+                      <th>정산 지급일</th>
+                      <th>특이사항</th>
+                    </tr>
+                  </thead>
+                  <tbody id="contract-status-list">
+                    <tr><td colspan="7" class="empty-state">등록된 계약이 없습니다.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
     </main>
   </div>
 
@@ -2076,6 +2180,108 @@
       <div class="modal-footer">
         <button class="btn btn-secondary btn-sm" onclick="closeModal('order-modal')">취소</button>
         <button class="btn btn-primary btn-sm" onclick="saveOrder()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Client Modal -->
+  <div class="modal-overlay" id="client-modal">
+    <div class="modal" style="max-width:640px;">
+      <div class="modal-header">
+        <h3 id="client-modal-title">거래처 추가</h3>
+        <button class="modal-close" onclick="closeModal('client-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="client-edit-index" value="">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>제작사명</label>
+            <input type="text" id="client-name" placeholder="제작사명">
+          </div>
+          <div class="form-group">
+            <label>사업자번호</label>
+            <input type="text" id="client-bizno" placeholder="000-00-00000">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>법인 통장 정보</label>
+          <input type="text" id="client-bank" placeholder="은행명 / 계좌번호 / 예금주">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>계약일자</label>
+            <input type="date" id="client-contract-date">
+          </div>
+          <div class="form-group">
+            <label>계약기간</label>
+            <input type="text" id="client-contract-period" placeholder="예: 1년, 2025.01~2025.12">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>계약상태</label>
+            <select id="client-status">
+              <option value="계약완료">계약완료</option>
+              <option value="협의중">협의중</option>
+              <option value="대기">대기</option>
+              <option value="종료">종료</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>수수료율 (%)</label>
+            <input type="text" id="client-fee-rate" placeholder="예: 25%">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>수수료 기준</label>
+          <select id="client-fee-basis">
+            <option value="부가세수수료제외">부가세수수료제외</option>
+            <option value="부가세수수료포함">부가세수수료포함</option>
+          </select>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>정산자료 제공일</label>
+            <input type="text" id="client-data-date" placeholder="예: 익월 7일">
+          </div>
+          <div class="form-group">
+            <label>정산 지급일</label>
+            <input type="text" id="client-pay-date" placeholder="예: 익월 말일">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>담당자 이름</label>
+            <input type="text" id="client-contact-name" placeholder="담당자 이름">
+          </div>
+          <div class="form-group">
+            <label>담당자 연락처</label>
+            <input type="text" id="client-contact-phone" placeholder="연락처">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>담당자 이메일</label>
+            <input type="text" id="client-contact-email" placeholder="이메일">
+          </div>
+          <div class="form-group">
+            <label>세금계산서 이메일</label>
+            <input type="text" id="client-tax-email" placeholder="세금계산서용 이메일">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>발주 담당자 이메일</label>
+          <input type="text" id="client-order-email" placeholder="발주 담당자 이메일">
+        </div>
+        <div class="form-group">
+          <label>특이사항/메모</label>
+          <textarea id="client-memo" rows="3" placeholder="특이사항이나 메모를 입력하세요"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost btn-sm" id="client-delete-btn" onclick="deleteClient()" style="color:var(--red); margin-right:auto; display:none;">삭제</button>
+        <button class="btn btn-secondary btn-sm" onclick="closeModal('client-modal')">취소</button>
+        <button class="btn btn-primary btn-sm" onclick="saveClient()">저장</button>
       </div>
     </div>
   </div>

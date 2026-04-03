@@ -523,6 +523,7 @@ function navigateTo(page) {
     case 'calendar': loadCalendar(); break;
     case 'messages': loadMessages(); break;
     case 'inventory': loadInventory(); break;
+    case 'clients': loadClients(); break;
   }
 }
 
@@ -3836,4 +3837,241 @@ function renderProjectCosts(projectId) {
     profitEl.textContent = '₩' + profit.toLocaleString();
     profitEl.style.color = profit >= 0 ? 'var(--primary)' : 'var(--red)';
   }
+}
+
+// ============================================
+// CLIENTS (거래처 관리)
+// ============================================
+
+function getClientStore() {
+  try { return JSON.parse(localStorage.getItem('gm_clients')) || []; }
+  catch { return []; }
+}
+
+function setClientStore(data) {
+  localStorage.setItem('gm_clients', JSON.stringify(data));
+}
+
+// Default client data (pre-populated from known publishers)
+function getDefaultClients() {
+  return [
+    { id: 'cl_1', name: '(주)다온크리에이티브', bizNo: '', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '부가세수수료제외', dataDate: '익월10일', payDate: '익월말일', contactName: '홍성일 파트장', contactEmail: 'sungil1102@daoncreative.com', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_2', name: '주식회사 제이비케이콘텐츠', bizNo: '', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '부가세수수료제외', dataDate: '익월7일', payDate: '정산후2주', contactName: '안병하 부장', contactEmail: 'ahn@jbkcorp.kr', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_3', name: '(주)재담미디어', bizNo: '105-87-84058', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '부가세수수료제외', dataDate: '익월7일', payDate: '익월15일', contactName: '이문수 PD', contactEmail: 'sio@jaedam.com', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_4', name: '주식회사 두세븐엔터테인먼트', bizNo: '332-86-02331', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '28%', feeBasis: '부가세수수료포함', dataDate: '익월10일', payDate: '익월말일', contactName: '전민희 차장', contactEmail: 'jeon@do7ent.com', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_5', name: '씨엔씨레볼루션(주)', bizNo: '220-86-24783', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '부가세수수료제외', dataDate: '익월7일', payDate: '익월말일', contactName: '황은해 팀장', contactEmail: 'hwang@cncrevolution.kr', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_6', name: '콘텐츠퍼스트 주식회사', bizNo: '113-86-67000', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25% (웻샌드20%)', feeBasis: '부가세수수료제외', dataDate: '익월10일', payDate: '익월말일', contactName: '황혜조 매니저', contactEmail: 'mickey@tappytoon.com', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_7', name: '코드엠아이엔씨(주)', bizNo: '333-81-00743', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '30%', feeBasis: '부가세수수료포함', dataDate: '익월5일', payDate: '익월말일', contactName: '이하늘 팀장', contactEmail: 'haneul@bifrostkr.com', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_8', name: '주식회사 북극여우', bizNo: '384-81-01468', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '부가세수수료제외', dataDate: '익월10일', payDate: '익월말일', contactName: '박세민', contactEmail: 'psmin@polarfoxbook.com', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_9', name: '디씨씨이엔티 주식회사', bizNo: '119-87-06686', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '부가세수수료제외', dataDate: '익월7일', payDate: '익월15일', contactName: '양희지 매니저', contactEmail: 'yangzi35@dcckor.com', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_10', name: '주식회사 블루픽', bizNo: '205-88-03575', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '수수료제외', dataDate: '익월15일', payDate: '익월말일', contactName: '이수빈 과장', contactEmail: 'book01@imageframe.kr', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' }
+  ];
+}
+
+function loadClients() {
+  let clients = getClientStore();
+  if (clients.length === 0) {
+    clients = getDefaultClients();
+    setClientStore(clients);
+  }
+  renderClientList();
+}
+
+function switchClientTab(tab, btnEl) {
+  // Hide all tabs
+  document.getElementById('clients-tab-list').style.display = 'none';
+  document.getElementById('clients-tab-contract').style.display = 'none';
+
+  // Show selected tab
+  document.getElementById('clients-tab-' + tab).style.display = 'block';
+
+  // Update tab buttons
+  document.querySelectorAll('.client-tab-btn').forEach(b => {
+    b.style.background = '';
+    b.style.color = '';
+  });
+  if (btnEl) {
+    btnEl.style.background = 'var(--primary)';
+    btnEl.style.color = 'white';
+  }
+
+  // Render content
+  if (tab === 'list') renderClientList();
+  else if (tab === 'contract') renderContractStatus();
+}
+
+function renderClientList() {
+  const clients = getClientStore();
+  const tbody = document.getElementById('client-list');
+  if (!tbody) return;
+
+  if (clients.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state">등록된 거래처가 없습니다.</td></tr>';
+    return;
+  }
+
+  const statusBadge = (s) => {
+    const colors = { '계약완료': 'working', '협의중': '', '대기': 'off', '종료': '' };
+    const cls = colors[s] || '';
+    if (s === '협의중') return `<span class="status-badge" style="background:var(--yellow-bg); color:#B8860B;">${s}</span>`;
+    if (s === '종료') return `<span class="status-badge" style="background:var(--gray-100); color:var(--gray-500);">${s}</span>`;
+    return `<span class="status-badge ${cls}">${s}</span>`;
+  };
+
+  tbody.innerHTML = clients.map((c, i) => `<tr style="cursor:pointer;" onclick="openClientModal(${i})">
+    <td style="font-weight:600;">${c.name}</td>
+    <td>${c.bizNo || '-'}</td>
+    <td>${statusBadge(c.status)}</td>
+    <td>${c.feeRate || '-'}</td>
+    <td style="font-size:12px;">${c.dataDate || '-'} / ${c.payDate || '-'}</td>
+    <td>${c.contactName || '-'}</td>
+    <td style="font-size:12px;">${c.contactEmail || '-'}</td>
+    <td>${c.contactPhone || '-'}</td>
+    <td style="font-size:12px; color:var(--gray-500);">${c.memo || '-'}</td>
+  </tr>`).join('');
+}
+
+function renderContractStatus() {
+  const clients = getClientStore();
+  const tbody = document.getElementById('contract-status-list');
+  if (!tbody) return;
+
+  // Update stats
+  const el = (id) => document.getElementById(id);
+  if (el('stat-total-clients')) el('stat-total-clients').textContent = clients.length;
+  if (el('stat-contracted-clients')) el('stat-contracted-clients').textContent = clients.filter(c => c.status === '계약완료').length;
+  if (el('stat-negotiating-clients')) el('stat-negotiating-clients').textContent = clients.filter(c => c.status === '협의중').length;
+
+  if (clients.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">등록된 계약이 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = clients.map(c => `<tr>
+    <td style="font-weight:600;">${c.name}</td>
+    <td>${c.contractDate || '-'}</td>
+    <td>${c.contractPeriod || '-'}</td>
+    <td>${c.feeRate || '-'} (${c.feeBasis || '-'})</td>
+    <td>${c.dataDate || '-'}</td>
+    <td>${c.payDate || '-'}</td>
+    <td style="font-size:12px; color:var(--gray-500);">${c.memo || '-'}</td>
+  </tr>`).join('');
+}
+
+function openClientModal(index) {
+  const modal = document.getElementById('client-modal');
+  const titleEl = document.getElementById('client-modal-title');
+  const editIdx = document.getElementById('client-edit-index');
+  const deleteBtn = document.getElementById('client-delete-btn');
+
+  // Reset fields
+  document.getElementById('client-name').value = '';
+  document.getElementById('client-bizno').value = '';
+  document.getElementById('client-bank').value = '';
+  document.getElementById('client-contract-date').value = '';
+  document.getElementById('client-contract-period').value = '';
+  document.getElementById('client-status').value = '계약완료';
+  document.getElementById('client-fee-rate').value = '';
+  document.getElementById('client-fee-basis').value = '부가세수수료제외';
+  document.getElementById('client-data-date').value = '';
+  document.getElementById('client-pay-date').value = '';
+  document.getElementById('client-contact-name').value = '';
+  document.getElementById('client-contact-email').value = '';
+  document.getElementById('client-contact-phone').value = '';
+  document.getElementById('client-tax-email').value = '';
+  document.getElementById('client-order-email').value = '';
+  document.getElementById('client-memo').value = '';
+
+  if (typeof index === 'number') {
+    // Edit mode
+    const clients = getClientStore();
+    const c = clients[index];
+    if (!c) return;
+
+    titleEl.textContent = '거래처 수정';
+    editIdx.value = index;
+    deleteBtn.style.display = 'inline-flex';
+
+    document.getElementById('client-name').value = c.name || '';
+    document.getElementById('client-bizno').value = c.bizNo || '';
+    document.getElementById('client-bank').value = c.bank || '';
+    document.getElementById('client-contract-date').value = c.contractDate || '';
+    document.getElementById('client-contract-period').value = c.contractPeriod || '';
+    document.getElementById('client-status').value = c.status || '계약완료';
+    document.getElementById('client-fee-rate').value = c.feeRate || '';
+    document.getElementById('client-fee-basis').value = c.feeBasis || '부가세수수료제외';
+    document.getElementById('client-data-date').value = c.dataDate || '';
+    document.getElementById('client-pay-date').value = c.payDate || '';
+    document.getElementById('client-contact-name').value = c.contactName || '';
+    document.getElementById('client-contact-email').value = c.contactEmail || '';
+    document.getElementById('client-contact-phone').value = c.contactPhone || '';
+    document.getElementById('client-tax-email').value = c.taxEmail || '';
+    document.getElementById('client-order-email').value = c.orderEmail || '';
+    document.getElementById('client-memo').value = c.memo || '';
+  } else {
+    titleEl.textContent = '거래처 추가';
+    editIdx.value = '';
+    deleteBtn.style.display = 'none';
+  }
+
+  modal.classList.add('active');
+}
+
+function saveClient() {
+  const name = document.getElementById('client-name').value.trim();
+  if (!name) { showToast('제작사명을 입력해주세요.', 'error'); return; }
+
+  const client = {
+    name: name,
+    bizNo: document.getElementById('client-bizno').value.trim(),
+    bank: document.getElementById('client-bank').value.trim(),
+    contractDate: document.getElementById('client-contract-date').value,
+    contractPeriod: document.getElementById('client-contract-period').value.trim(),
+    status: document.getElementById('client-status').value,
+    feeRate: document.getElementById('client-fee-rate').value.trim(),
+    feeBasis: document.getElementById('client-fee-basis').value,
+    dataDate: document.getElementById('client-data-date').value.trim(),
+    payDate: document.getElementById('client-pay-date').value.trim(),
+    contactName: document.getElementById('client-contact-name').value.trim(),
+    contactEmail: document.getElementById('client-contact-email').value.trim(),
+    contactPhone: document.getElementById('client-contact-phone').value.trim(),
+    taxEmail: document.getElementById('client-tax-email').value.trim(),
+    orderEmail: document.getElementById('client-order-email').value.trim(),
+    memo: document.getElementById('client-memo').value.trim()
+  };
+
+  const clients = getClientStore();
+  const editIdx = document.getElementById('client-edit-index').value;
+
+  if (editIdx !== '') {
+    // Update existing
+    const idx = parseInt(editIdx);
+    client.id = clients[idx].id;
+    clients[idx] = client;
+    showToast('거래처가 수정되었습니다.', 'success');
+  } else {
+    // Add new
+    client.id = 'cl_' + Date.now();
+    clients.push(client);
+    showToast('거래처가 추가되었습니다.', 'success');
+  }
+
+  setClientStore(clients);
+  closeModal('client-modal');
+  renderClientList();
+}
+
+function deleteClient() {
+  const editIdx = document.getElementById('client-edit-index').value;
+  if (editIdx === '') return;
+
+  if (!confirm('이 거래처를 삭제하시겠습니까?')) return;
+
+  const clients = getClientStore();
+  clients.splice(parseInt(editIdx), 1);
+  setClientStore(clients);
+
+  closeModal('client-modal');
+  renderClientList();
+  showToast('거래처가 삭제되었습니다.', 'success');
 }
