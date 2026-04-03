@@ -58,6 +58,10 @@
             <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
             프로젝트
           </a>
+          <a class="nav-item" data-page="inventory" onclick="navigateTo('inventory')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            재고관리
+          </a>
         </div>
 
         <div class="nav-section">
@@ -708,6 +712,32 @@
               </table>
             </div>
           </div>
+
+          <!-- 주간 근무시간 현황 -->
+          <div class="card" style="margin-top:16px;">
+            <div class="card-header">
+              <h3>주간 근무시간 현황</h3>
+              <span style="font-size:12px; color:var(--gray-400);">근로기준법 기반 자동 계산</span>
+            </div>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>이름</th>
+                    <th>이번 주</th>
+                    <th>이번 달</th>
+                    <th>시급</th>
+                    <th>예상 월급</th>
+                    <th>상태</th>
+                  </tr>
+                </thead>
+                <tbody id="schedule-hours-table">
+                  <tr><td colspan="6" class="empty-state">스케줄 데이터를 불러오는 중...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -1291,6 +1321,9 @@
         <div class="form-group">
           <label>메모</label>
           <textarea id="schedule-memo" placeholder="메모 (선택)" style="height:60px;"></textarea>
+        </div>
+        <!-- 주간 누적 근무시간 표시 -->
+        <div id="schedule-modal-hours-info" style="display:none; padding:10px 14px; border-radius:8px; margin-top:8px; font-size:13px; font-weight:600;">
         </div>
       </div>
       <div class="modal-footer">

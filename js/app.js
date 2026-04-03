@@ -904,6 +904,10 @@ async function openHRModal(userId) {
 // Schedule (근무 스케줄)
 // ============================================
 
+const MIN_WAGE_2026 = 10320; // 2026년 최저시급
+const WEEKLY_LIMIT = 52;
+const OVERTIME_THRESHOLD = 40;
+
 let scheduleYear = new Date().getFullYear();
 let scheduleMonth = new Date().getMonth(); // 0-indexed
 
@@ -1087,6 +1091,7 @@ function renderCalendar(year, month) {
   }
 
   tbody.innerHTML = html;
+  calculateScheduleHours();
 }
 
 async function openScheduleModal(dateStr) {
@@ -1117,6 +1122,28 @@ async function openScheduleModal(dateStr) {
   document.getElementById('schedule-break').value = '60';
   document.getElementById('schedule-memo').value = '';
   if (userSelect) userSelect.value = '';
+
+  // Attach event listeners for modal hours tracking (remove old ones first)
+  const modalInputs = ['schedule-user', 'schedule-date', 'schedule-start', 'schedule-end', 'schedule-break'];
+  modalInputs.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.removeEventListener('change', updateScheduleModalHours);
+      el.addEventListener('change', updateScheduleModalHours);
+    }
+  });
+  // Also listen on input for time fields
+  ['schedule-start', 'schedule-end'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.removeEventListener('input', updateScheduleModalHours);
+      el.addEventListener('input', updateScheduleModalHours);
+    }
+  });
+
+  // Reset modal hours info
+  const infoEl = document.getElementById('schedule-modal-hours-info');
+  if (infoEl) infoEl.style.display = 'none';
 
   openModal('schedule-modal');
 }
@@ -1154,6 +1181,217 @@ function saveScheduleEntry() {
   closeModal('schedule-modal');
   showToast('스케줄이 등록되었습니다.', 'success');
   renderCalendar(scheduleYear, scheduleMonth);
+}
+
+function calculateScheduleHours() {
+  const tbody = document.getElementById('schedule-hours-table');
+  if (!tbody) return;
+
+  const store = getScheduleStore();
+  const hrStore = getHRStore();
+  const now = new Date();
+  const year = scheduleYear;
+  const month = scheduleMonth;
+
+  // Get all entries for the current displayed month
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const workerData = {}; // { name: { weekHours, monthHours, dailyDetails: [{date, hours}] } }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const entries = store[dateStr] || [];
+    entries.forEach(entry => {
+      if (!workerData[entry.name]) {
+        workerData[entry.name] = { weekHours: 0, monthHours: 0, dailyDetails: [], userId: entry.userId || null };
+      }
+      const [sh, sm] = entry.startTime.split(':').map(Number);
+      const [eh, em] = entry.endTime.split(':').map(Number);
+      const totalMin = (eh * 60 + em) - (sh * 60 + sm) - (entry.breakMin || 0);
+      const hours = Math.max(0, totalMin / 60);
+      workerData[entry.name].monthHours += hours;
+      workerData[entry.name].dailyDetails.push({ date: dateStr, hours: hours });
+    });
+  }
+
+  // Calculate current week hours (Mon-Sun containing today or the displayed month's context)
+  const today = new Date();
+  // Find the Monday of the current week
+  const dayOfWeek = today.getDay(); // 0=Sun
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + mondayOffset);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const mondayStr = monday.toISOString().split('T')[0];
+  const sundayStr = sunday.toISOString().split('T')[0];
+
+  // Recalculate weekly hours for each worker
+  for (const name in workerData) {
+    let weekHours = 0;
+    workerData[name].dailyDetails.forEach(d => {
+      if (d.date >= mondayStr && d.date <= sundayStr) {
+        weekHours += d.hours;
+      }
+    });
+    workerData[name].weekHours = weekHours;
+  }
+
+  // Get hourly rates from HR data
+  function getHourlyRate(workerName, userId) {
+    // Try to find by userId first, then by name match
+    for (const id in hrStore) {
+      const hr = hrStore[id];
+      if (hr.payType === '시급' && hr.payAmount) {
+        if (id === userId) return hr.payAmount;
+        if (hr.name && hr.name === workerName) return hr.payAmount;
+      }
+    }
+    return MIN_WAGE_2026;
+  }
+
+  const names = Object.keys(workerData).sort();
+  if (names.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">이번 달 스케줄 데이터가 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = names.map(name => {
+    const data = workerData[name];
+    const weekHours = data.weekHours;
+    const monthHours = data.monthHours;
+    const hourlyRate = getHourlyRate(name, data.userId);
+
+    // Calculate estimated monthly pay with overtime
+    // We need to calculate week by week for the whole month
+    let totalPay = 0;
+    let totalWeeklyHolidayPay = 0;
+
+    // Group days by ISO week
+    const weekMap = {};
+    data.dailyDetails.forEach(d => {
+      const dt = new Date(d.date);
+      // Get ISO week start (Monday)
+      const dow = dt.getDay();
+      const monOff = dow === 0 ? -6 : 1 - dow;
+      const wkMon = new Date(dt);
+      wkMon.setDate(dt.getDate() + monOff);
+      const wkKey = wkMon.toISOString().split('T')[0];
+      if (!weekMap[wkKey]) weekMap[wkKey] = 0;
+      weekMap[wkKey] += d.hours;
+    });
+
+    for (const wkKey in weekMap) {
+      const wkHrs = weekMap[wkKey];
+      const regular = Math.min(wkHrs, OVERTIME_THRESHOLD);
+      const overtime = Math.max(0, Math.min(wkHrs, WEEKLY_LIMIT) - OVERTIME_THRESHOLD);
+      const overLimit = Math.max(0, wkHrs - WEEKLY_LIMIT);
+      totalPay += regular * hourlyRate;
+      totalPay += overtime * hourlyRate * 1.5;
+      totalPay += overLimit * hourlyRate * 1.5; // over 52 still gets overtime rate
+      // Weekly holiday pay: if >= 15 hours, add proportional
+      if (wkHrs >= 15) {
+        totalWeeklyHolidayPay += (wkHrs / 40) * 8 * hourlyRate;
+      }
+    }
+    totalPay += totalWeeklyHolidayPay;
+
+    // Status badge
+    let statusHtml = '';
+    if (weekHours > WEEKLY_LIMIT) {
+      statusHtml = '<span style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; background:#fecaca; color:#dc2626;">&#9888;&#65039; 52시간 초과</span>';
+    } else if (weekHours > OVERTIME_THRESHOLD) {
+      statusHtml = '<span style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; background:#fef3c7; color:#b45309;">연장근무 발생</span>';
+    } else {
+      statusHtml = '<span style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; background:#d1fae5; color:#047857;">정상</span>';
+    }
+
+    // Week hours color
+    let weekColor = '#047857'; // green
+    if (weekHours > WEEKLY_LIMIT) weekColor = '#dc2626'; // red
+    else if (weekHours > OVERTIME_THRESHOLD) weekColor = '#b45309'; // yellow/amber
+
+    return `<tr>
+      <td><strong>${name}</strong></td>
+      <td style="font-weight:700; color:${weekColor};">${weekHours.toFixed(1)}시간</td>
+      <td>${monthHours.toFixed(1)}시간</td>
+      <td>${hourlyRate.toLocaleString()}원</td>
+      <td style="font-weight:700;">${Math.round(totalPay).toLocaleString()}원</td>
+      <td>${statusHtml}</td>
+    </tr>`;
+  }).join('');
+}
+
+function updateScheduleModalHours() {
+  const infoEl = document.getElementById('schedule-modal-hours-info');
+  if (!infoEl) return;
+
+  const userSelect = document.getElementById('schedule-user');
+  const dateInput = document.getElementById('schedule-date');
+  const startInput = document.getElementById('schedule-start');
+  const endInput = document.getElementById('schedule-end');
+  const breakSelect = document.getElementById('schedule-break');
+
+  if (!userSelect || !userSelect.value || !dateInput.value) {
+    infoEl.style.display = 'none';
+    return;
+  }
+
+  const selectedOption = userSelect.options[userSelect.selectedIndex];
+  const workerName = selectedOption ? selectedOption.getAttribute('data-name') : '';
+  if (!workerName) { infoEl.style.display = 'none'; return; }
+
+  const store = getScheduleStore();
+  const selectedDate = new Date(dateInput.value);
+  const dow = selectedDate.getDay();
+  const monOff = dow === 0 ? -6 : 1 - dow;
+  const monday = new Date(selectedDate);
+  monday.setDate(selectedDate.getDate() + monOff);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const mondayStr = monday.toISOString().split('T')[0];
+  const sundayStr = sunday.toISOString().split('T')[0];
+
+  // Sum existing weekly hours for this worker
+  let existingWeekHours = 0;
+  for (const dateStr in store) {
+    if (dateStr >= mondayStr && dateStr <= sundayStr) {
+      (store[dateStr] || []).forEach(entry => {
+        if (entry.name === workerName) {
+          const [sh, sm] = entry.startTime.split(':').map(Number);
+          const [eh, em] = entry.endTime.split(':').map(Number);
+          const mins = (eh * 60 + em) - (sh * 60 + sm) - (entry.breakMin || 0);
+          existingWeekHours += Math.max(0, mins / 60);
+        }
+      });
+    }
+  }
+
+  // Calculate new entry hours
+  let newEntryHours = 0;
+  if (startInput.value && endInput.value) {
+    const [sh, sm] = startInput.value.split(':').map(Number);
+    const [eh, em] = endInput.value.split(':').map(Number);
+    const breakMin = parseInt(breakSelect.value) || 0;
+    newEntryHours = Math.max(0, ((eh * 60 + em) - (sh * 60 + sm) - breakMin) / 60);
+  }
+
+  const totalWeek = existingWeekHours + newEntryHours;
+
+  infoEl.style.display = 'block';
+  if (totalWeek > WEEKLY_LIMIT) {
+    infoEl.style.background = '#fecaca';
+    infoEl.style.color = '#dc2626';
+    infoEl.innerHTML = `&#9888;&#65039; <strong>${workerName}</strong>의 이번 주 누적: <strong>${totalWeek.toFixed(1)}시간</strong> (52시간 초과! 근로기준법 위반)`;
+  } else if (totalWeek > OVERTIME_THRESHOLD) {
+    infoEl.style.background = '#fef3c7';
+    infoEl.style.color = '#b45309';
+    infoEl.innerHTML = `<strong>${workerName}</strong>의 이번 주 누적: <strong>${totalWeek.toFixed(1)}시간</strong> (연장근무 ${(totalWeek - OVERTIME_THRESHOLD).toFixed(1)}시간 발생)`;
+  } else {
+    infoEl.style.background = '#d1fae5';
+    infoEl.style.color = '#047857';
+    infoEl.innerHTML = `<strong>${workerName}</strong>의 이번 주 누적: <strong>${totalWeek.toFixed(1)}시간</strong>`;
+  }
 }
 
 function deleteScheduleEntry(dateStr, index) {
