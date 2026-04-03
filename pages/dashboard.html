@@ -409,6 +409,13 @@
         </div>
         <div class="page-body">
 
+          <!-- Settlement Tabs -->
+          <div class="tabs" style="margin-bottom:16px; display:flex; gap:0; border-bottom:2px solid var(--gray-200);">
+            <div class="tab-item active" onclick="switchSettleTab('publisher')" id="settle-tab-btn-publisher" style="padding:10px 20px; font-weight:600; font-size:14px; cursor:pointer; border-bottom:2px solid var(--primary); margin-bottom:-2px; color:var(--primary);">제작사 정산</div>
+            <div class="tab-item" onclick="switchSettleTab('urban')" id="settle-tab-btn-urban" style="padding:10px 20px; font-weight:600; font-size:14px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; color:var(--gray-500);">어반플레이 정산</div>
+          </div>
+
+          <div id="settle-tab-publisher">
           <!-- STEP 1: 엑셀 업로드 -->
           <div id="settle-step1" class="card" style="margin-bottom:24px;">
             <div class="card-header">
@@ -520,6 +527,211 @@
                       <td></td>
                     </tr>
                   </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+          </div><!-- /settle-tab-publisher -->
+
+          <!-- Urban Play Settlement Tab -->
+          <div id="settle-tab-urban" style="display:none;">
+            <div class="card" style="margin-bottom:24px;">
+              <div class="card-header">
+                <h3>어반플레이 정산</h3>
+                <span style="font-size:12px; color:var(--gray-400);">매장 수익분배 기반 월간 정산</span>
+              </div>
+              <div class="card-body">
+                <div class="form-group" style="max-width:240px; margin-bottom:20px;">
+                  <label>정산 월</label>
+                  <input type="month" id="urban-settle-month" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;" onchange="calculateUrbanSettlement()">
+                </div>
+
+                <!-- 수입 -->
+                <div style="background:var(--green-bg); border-radius:10px; padding:16px 20px; margin-bottom:16px;">
+                  <div style="font-size:13px; font-weight:700; color:var(--green); margin-bottom:12px;">수입</div>
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group">
+                      <label style="font-size:12px;">1~3층 판매매출 (GM 25% 몫)</label>
+                      <input type="number" id="urban-store-sales" placeholder="0" oninput="calculateUrbanSettlement()" style="width:100%; padding:8px 10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                    </div>
+                    <div class="form-group">
+                      <label style="font-size:12px;">가챠 매출 (22% 수수료)</label>
+                      <input type="number" id="urban-gacha-sales" placeholder="0" oninput="calculateUrbanSettlement()" style="width:100%; padding:8px 10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                    </div>
+                  </div>
+                  <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08);">
+                    <span style="font-size:13px; font-weight:600; color:var(--gray-600);">매출 합계:</span>
+                    <span id="urban-total-revenue" style="font-size:16px; font-weight:800; color:var(--green);">₩0</span>
+                  </div>
+                </div>
+
+                <!-- 비용 -->
+                <div style="background:var(--red-bg); border-radius:10px; padding:16px 20px; margin-bottom:16px;">
+                  <div style="font-size:13px; font-weight:700; color:var(--red); margin-bottom:12px;">비용</div>
+                  <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+                    <div class="form-group">
+                      <label style="font-size:12px;">매장직 인건비</label>
+                      <div style="display:flex; gap:4px;">
+                        <input type="number" id="urban-labor-cost" placeholder="0" oninput="calculateUrbanSettlement()" style="flex:1; padding:8px 10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                        <button class="btn btn-ghost btn-sm" onclick="loadHRLaborCost()" title="인사관리에서 가져오기" style="padding:8px; font-size:11px; white-space:nowrap;">HR</button>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label style="font-size:12px;">소모품비</label>
+                      <input type="number" id="urban-supplies-cost" placeholder="0" oninput="calculateUrbanSettlement()" style="width:100%; padding:8px 10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                    </div>
+                    <div class="form-group">
+                      <label style="font-size:12px;">관리비</label>
+                      <input type="number" id="urban-mgmt-cost" placeholder="0" oninput="calculateUrbanSettlement()" style="width:100%; padding:8px 10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                    </div>
+                  </div>
+                  <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08);">
+                    <span style="font-size:13px; font-weight:600; color:var(--gray-600);">비용 합계:</span>
+                    <span id="urban-total-cost" style="font-size:16px; font-weight:800; color:var(--red);">₩0</span>
+                  </div>
+                </div>
+
+                <!-- 정산 결과 -->
+                <div style="background:var(--gray-50); border-radius:10px; padding:16px 20px;">
+                  <div style="font-size:13px; font-weight:700; color:var(--gray-700); margin-bottom:12px;">정산</div>
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 24px; font-size:14px;">
+                    <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--gray-200);">
+                      <span style="color:var(--gray-600);">비용보전 (비용의 50%)</span>
+                      <span id="urban-cost-share" style="font-weight:700;">₩0</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--gray-200);">
+                      <span style="color:var(--gray-600);">순익 (매출 - 비용 + 비용보전)</span>
+                      <span id="urban-net-profit" style="font-weight:700;">₩0</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--gray-200);">
+                      <span style="color:var(--blue);">어반플레이 몫 (50%)</span>
+                      <span id="urban-urban-share" style="font-weight:700; color:var(--blue);">₩0</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--gray-200);">
+                      <span style="color:var(--primary);">굿즈모먼트 몫 (50%)</span>
+                      <span id="urban-gm-share" style="font-weight:700; color:var(--primary);">₩0</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--gray-200);">
+                      <span style="color:var(--gray-600);">3층 임대료</span>
+                      <span id="urban-rent" style="font-weight:700;">₩2,500,000</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--gray-200);">
+                      <span style="color:var(--gray-600);">관리비</span>
+                      <span id="urban-mgmt-display" style="font-weight:700;">₩0</span>
+                    </div>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; padding-top:12px; border-top:2px solid var(--gray-300);">
+                    <span style="font-size:16px; font-weight:800; color:var(--gray-700);">총 지급액 (VAT 포함)</span>
+                    <span id="urban-total-payment" style="font-size:22px; font-weight:800; color:var(--red);">₩0</span>
+                  </div>
+                </div>
+
+                <button class="btn btn-primary" onclick="downloadUrbanSettlement()" style="width:100%; margin-top:20px;">정산서 다운로드 (Excel)</button>
+              </div>
+            </div>
+          </div><!-- /settle-tab-urban -->
+
+        </div>
+      </div>
+
+      <!-- ===== INVENTORY (재고관리) ===== -->
+      <div id="section-inventory" class="page-section" style="display:none;">
+        <div class="page-header">
+          <div>
+            <h1>재고관리</h1>
+            <div class="header-sub">입고/재고 현황 및 발주 요청</div>
+          </div>
+        </div>
+        <div class="page-body">
+
+          <!-- Inventory Tabs -->
+          <div style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-sm inv-tab-btn" onclick="switchInventoryTab('stock', this)" style="background:var(--primary); color:white;">재고 현황</button>
+            <button class="btn btn-ghost btn-sm inv-tab-btn" onclick="switchInventoryTab('receiving', this)">입고 관리</button>
+            <button class="btn btn-ghost btn-sm inv-tab-btn" onclick="switchInventoryTab('orders', this)">발주 요청</button>
+          </div>
+
+          <!-- Tab 1: 재고 현황 -->
+          <div id="inv-tab-stock">
+            <div class="card">
+              <div class="card-header">
+                <h3>재고 현황</h3>
+                <button class="btn btn-primary btn-sm" onclick="openModal('inventory-modal')">+ 상품 등록</button>
+              </div>
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>제작사</th>
+                      <th>상품명</th>
+                      <th>현재 재고</th>
+                      <th>최소 재고</th>
+                      <th>상태</th>
+                      <th>최근 입고일</th>
+                      <th>관리</th>
+                    </tr>
+                  </thead>
+                  <tbody id="inventory-stock-list">
+                    <tr><td colspan="7" class="empty-state">등록된 상품이 없습니다.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: 입고 관리 -->
+          <div id="inv-tab-receiving" style="display:none;">
+            <div class="card">
+              <div class="card-header">
+                <h3>입고 관리</h3>
+                <button class="btn btn-primary btn-sm" onclick="openModal('receiving-modal')">+ 입고 등록</button>
+              </div>
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>입고일</th>
+                      <th>제작사</th>
+                      <th>상품명</th>
+                      <th>예정수량</th>
+                      <th>실입고수량</th>
+                      <th>차이</th>
+                      <th>상태</th>
+                      <th>확인자</th>
+                      <th>관리</th>
+                    </tr>
+                  </thead>
+                  <tbody id="inventory-receiving-list">
+                    <tr><td colspan="9" class="empty-state">입고 기록이 없습니다.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 3: 발주 요청 -->
+          <div id="inv-tab-orders" style="display:none;">
+            <div class="card">
+              <div class="card-header">
+                <h3>발주 요청</h3>
+                <button class="btn btn-primary btn-sm" onclick="openModal('order-modal')">+ 발주 요청</button>
+              </div>
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>요청일</th>
+                      <th>제작사</th>
+                      <th>상품명</th>
+                      <th>요청수량</th>
+                      <th>상태</th>
+                      <th>요청자</th>
+                      <th>관리</th>
+                    </tr>
+                  </thead>
+                  <tbody id="inventory-order-list">
+                    <tr><td colspan="7" class="empty-state">발주 요청이 없습니다.</td></tr>
+                  </tbody>
                 </table>
               </div>
             </div>
@@ -1682,6 +1894,121 @@
         <div style="flex:1;"></div>
         <button class="btn btn-secondary btn-sm" onclick="closeModal('calendar-modal')">취소</button>
         <button class="btn btn-primary btn-sm" onclick="saveCalendarEvent()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inventory Modal -->
+  <div class="modal-overlay" id="inventory-modal">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-header">
+        <h3>상품 등록</h3>
+        <button class="modal-close" onclick="closeModal('inventory-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="inv-edit-index" value="">
+        <div class="form-group">
+          <label>제작사</label>
+          <input type="text" id="inv-publisher" placeholder="예: 북극여우">
+        </div>
+        <div class="form-group">
+          <label>상품명</label>
+          <input type="text" id="inv-product-name" placeholder="상품명">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>현재 재고</label>
+            <input type="number" id="inv-current-stock" placeholder="0" value="0">
+          </div>
+          <div class="form-group">
+            <label>최소 재고</label>
+            <input type="number" id="inv-min-stock" placeholder="10" value="10">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>최근 입고일</label>
+          <input type="date" id="inv-last-received">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="closeModal('inventory-modal')">취소</button>
+        <button class="btn btn-primary btn-sm" onclick="saveInventoryItem()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Receiving Modal -->
+  <div class="modal-overlay" id="receiving-modal">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-header">
+        <h3>입고 등록</h3>
+        <button class="modal-close" onclick="closeModal('receiving-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="recv-edit-index" value="">
+        <div class="form-group">
+          <label>입고일</label>
+          <input type="date" id="recv-date">
+        </div>
+        <div class="form-group">
+          <label>제작사</label>
+          <input type="text" id="recv-publisher" placeholder="제작사">
+        </div>
+        <div class="form-group">
+          <label>상품명</label>
+          <input type="text" id="recv-product-name" placeholder="상품명">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>예정수량</label>
+            <input type="number" id="recv-expected-qty" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label>실입고수량</label>
+            <input type="number" id="recv-actual-qty" placeholder="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>확인자</label>
+          <input type="text" id="recv-checker" placeholder="확인자 이름">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="closeModal('receiving-modal')">취소</button>
+        <button class="btn btn-primary btn-sm" onclick="saveReceiving()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Modal -->
+  <div class="modal-overlay" id="order-modal">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-header">
+        <h3>발주 요청</h3>
+        <button class="modal-close" onclick="closeModal('order-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="order-edit-index" value="">
+        <div class="form-group">
+          <label>제작사</label>
+          <input type="text" id="order-publisher" placeholder="제작사">
+        </div>
+        <div class="form-group">
+          <label>상품명</label>
+          <input type="text" id="order-product-name" placeholder="상품명">
+        </div>
+        <div class="form-group">
+          <label>요청수량</label>
+          <input type="number" id="order-qty" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label>요청자</label>
+          <input type="text" id="order-requester" placeholder="요청자 이름">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="closeModal('order-modal')">취소</button>
+        <button class="btn btn-primary btn-sm" onclick="saveOrder()">저장</button>
       </div>
     </div>
   </div>

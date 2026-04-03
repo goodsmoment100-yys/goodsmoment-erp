@@ -522,6 +522,7 @@ function navigateTo(page) {
     case 'accounts': loadAccounts(); loadContacts(); loadParttimeContacts(); break;
     case 'calendar': loadCalendar(); break;
     case 'messages': loadMessages(); break;
+    case 'inventory': loadInventory(); break;
   }
 }
 
@@ -2893,4 +2894,356 @@ async function sendMessage() {
   closeModal('message-modal');
   showToast('메시지가 전송되었습니다.', 'success');
   loadMessages();
+}
+
+// ============================================
+// Inventory Management (재고관리)
+// ============================================
+
+function getInventoryStore() {
+  try {
+    var data = JSON.parse(localStorage.getItem('gm_inventory') || 'null');
+    if (data !== null) return data;
+  } catch (e) {}
+
+  // Pre-populate sample items
+  var defaults = [
+    { publisher: '북극여우', name: '꿈이상 아크릴 키링', currentStock: 45, minStock: 10, lastReceived: '2026-03-20' },
+    { publisher: '북극여우', name: '향막 포스터 세트', currentStock: 8, minStock: 15, lastReceived: '2026-03-15' },
+    { publisher: '작두', name: '작두 스티커팩', currentStock: 120, minStock: 20, lastReceived: '2026-03-25' },
+    { publisher: '작두', name: '작두 엽서 세트', currentStock: 0, minStock: 10, lastReceived: '2026-02-28' },
+    { publisher: '킬러배드로', name: '킬배 미니피규어', currentStock: 32, minStock: 10, lastReceived: '2026-03-28' },
+    { publisher: '킬러배드로', name: '킬배 폰케이스', currentStock: 5, minStock: 8, lastReceived: '2026-03-10' }
+  ];
+  localStorage.setItem('gm_inventory', JSON.stringify(defaults));
+  return defaults;
+}
+
+function getReceivingStore() {
+  try {
+    var data = JSON.parse(localStorage.getItem('gm_receiving') || 'null');
+    if (data !== null) return data;
+  } catch (e) {}
+
+  var defaults = [
+    { date: '2026-03-28', publisher: '킬러배드로', name: '킬배 미니피규어', expectedQty: 50, actualQty: 50, status: 'completed', checker: '이슬' },
+    { date: '2026-03-25', publisher: '작두', name: '작두 스티커팩', expectedQty: 100, actualQty: 100, status: 'completed', checker: '김형희' },
+    { date: '2026-04-05', publisher: '북극여우', name: '향막 포스터 세트', expectedQty: 30, actualQty: 0, status: 'expected', checker: '' }
+  ];
+  localStorage.setItem('gm_receiving', JSON.stringify(defaults));
+  return defaults;
+}
+
+function getOrderStore() {
+  try {
+    var data = JSON.parse(localStorage.getItem('gm_orders') || 'null');
+    if (data !== null) return data;
+  } catch (e) {}
+
+  var defaults = [
+    { date: '2026-04-02', publisher: '작두', name: '작두 엽서 세트', qty: 50, status: 'requested', requester: '문지민' },
+    { date: '2026-04-03', publisher: '북극여우', name: '향막 포스터 세트', qty: 30, status: 'ordered', requester: '이슬' }
+  ];
+  localStorage.setItem('gm_orders', JSON.stringify(defaults));
+  return defaults;
+}
+
+function loadInventory() {
+  renderInventoryStock();
+  renderReceiving();
+  renderOrders();
+  checkLowStock();
+}
+
+function switchInventoryTab(tabName, btnEl) {
+  var tabs = ['stock', 'receiving', 'orders'];
+  tabs.forEach(function(t) {
+    var el = document.getElementById('inv-tab-' + t);
+    if (el) el.style.display = 'none';
+  });
+  document.querySelectorAll('.inv-tab-btn').forEach(function(el) {
+    el.style.background = 'transparent';
+    el.style.color = 'var(--gray-600)';
+  });
+  var activeTab = document.getElementById('inv-tab-' + tabName);
+  if (activeTab) activeTab.style.display = 'block';
+  if (btnEl) {
+    btnEl.style.background = 'var(--primary)';
+    btnEl.style.color = 'white';
+  }
+}
+
+function renderInventoryStock() {
+  var items = getInventoryStore();
+  var tbody = document.getElementById('inventory-stock-list');
+  if (!tbody) return;
+
+  if (items.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">등록된 상품이 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = items.map(function(item, idx) {
+    var statusText, statusClass, warn;
+    if (item.currentStock <= 0) {
+      statusText = '품절'; statusClass = 'background:var(--red-bg); color:var(--red);'; warn = '';
+    } else if (item.currentStock < item.minStock) {
+      statusText = '부족'; statusClass = 'background:var(--yellow-bg); color:#B8860B;'; warn = ' \u26A0\uFE0F';
+    } else {
+      statusText = '정상'; statusClass = 'background:var(--green-bg); color:var(--green);'; warn = '';
+    }
+
+    return '<tr>' +
+      '<td>' + item.publisher + '</td>' +
+      '<td><strong>' + item.name + '</strong>' + warn + '</td>' +
+      '<td style="font-weight:700;">' + item.currentStock + '</td>' +
+      '<td>' + item.minStock + '</td>' +
+      '<td><span style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; ' + statusClass + '">' + statusText + '</span></td>' +
+      '<td style="font-size:13px; color:var(--gray-500);">' + (item.lastReceived || '-') + '</td>' +
+      '<td>' +
+        '<button class="btn btn-ghost btn-sm" onclick="editInventoryItem(' + idx + ')" style="font-size:12px;">수정</button>' +
+        '<button class="btn btn-ghost btn-sm" onclick="deleteInventoryItem(' + idx + ')" style="color:var(--red); font-size:12px;">삭제</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function saveInventoryItem() {
+  var editIdx = document.getElementById('inv-edit-index').value;
+  var publisher = document.getElementById('inv-publisher').value.trim();
+  var name = document.getElementById('inv-product-name').value.trim();
+  var currentStock = parseInt(document.getElementById('inv-current-stock').value) || 0;
+  var minStock = parseInt(document.getElementById('inv-min-stock').value) || 10;
+  var lastReceived = document.getElementById('inv-last-received').value;
+
+  if (!publisher) { showToast('제작사를 입력해주세요.', 'error'); return; }
+  if (!name) { showToast('상품명을 입력해주세요.', 'error'); return; }
+
+  var items = getInventoryStore();
+
+  if (editIdx !== '') {
+    items[parseInt(editIdx)] = { publisher: publisher, name: name, currentStock: currentStock, minStock: minStock, lastReceived: lastReceived };
+    showToast('상품 정보가 수정되었습니다.', 'success');
+  } else {
+    items.push({ publisher: publisher, name: name, currentStock: currentStock, minStock: minStock, lastReceived: lastReceived });
+    showToast('상품이 등록되었습니다.', 'success');
+  }
+
+  localStorage.setItem('gm_inventory', JSON.stringify(items));
+  closeModal('inventory-modal');
+  loadInventory();
+}
+
+function editInventoryItem(idx) {
+  var items = getInventoryStore();
+  var item = items[idx];
+  if (!item) return;
+
+  document.getElementById('inv-edit-index').value = idx;
+  document.getElementById('inv-publisher').value = item.publisher || '';
+  document.getElementById('inv-product-name').value = item.name || '';
+  document.getElementById('inv-current-stock').value = item.currentStock || 0;
+  document.getElementById('inv-min-stock').value = item.minStock || 10;
+  document.getElementById('inv-last-received').value = item.lastReceived || '';
+
+  openModal('inventory-modal');
+}
+
+function deleteInventoryItem(idx) {
+  if (!confirm('이 상품을 삭제하시겠습니까?')) return;
+  var items = getInventoryStore();
+  items.splice(idx, 1);
+  localStorage.setItem('gm_inventory', JSON.stringify(items));
+  showToast('상품이 삭제되었습니다.', 'success');
+  loadInventory();
+}
+
+function renderReceiving() {
+  var records = getReceivingStore();
+  var tbody = document.getElementById('inventory-receiving-list');
+  if (!tbody) return;
+
+  if (records.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state">입고 기록이 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = records.map(function(rec, idx) {
+    var diff = rec.actualQty - rec.expectedQty;
+    var diffText = diff === 0 ? '-' : (diff > 0 ? '+' + diff : '' + diff);
+    var statusText, statusStyle;
+    if (rec.status === 'expected') {
+      statusText = '예정'; statusStyle = 'background:var(--blue-bg); color:var(--blue);';
+    } else if (rec.expectedQty !== rec.actualQty && rec.status === 'completed') {
+      statusText = '불일치'; statusStyle = 'background:var(--red-bg); color:var(--red);';
+    } else {
+      statusText = '완료'; statusStyle = 'background:var(--green-bg); color:var(--green);';
+    }
+
+    return '<tr>' +
+      '<td style="font-size:13px;">' + rec.date + '</td>' +
+      '<td>' + rec.publisher + '</td>' +
+      '<td><strong>' + rec.name + '</strong></td>' +
+      '<td>' + rec.expectedQty + '</td>' +
+      '<td>' + (rec.actualQty || '-') + '</td>' +
+      '<td style="font-weight:700; color:' + (diff !== 0 && rec.status !== 'expected' ? 'var(--red)' : 'var(--gray-500)') + ';">' + diffText + '</td>' +
+      '<td><span style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; ' + statusStyle + '">' + statusText + '</span></td>' +
+      '<td style="font-size:13px;">' + (rec.checker || '-') + '</td>' +
+      '<td><button class="btn btn-ghost btn-sm" onclick="deleteReceiving(' + idx + ')" style="color:var(--red); font-size:12px;">삭제</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function saveReceiving() {
+  var date = document.getElementById('recv-date').value;
+  var publisher = document.getElementById('recv-publisher').value.trim();
+  var name = document.getElementById('recv-product-name').value.trim();
+  var expectedQty = parseInt(document.getElementById('recv-expected-qty').value) || 0;
+  var actualQty = parseInt(document.getElementById('recv-actual-qty').value) || 0;
+  var checker = document.getElementById('recv-checker').value.trim();
+
+  if (!date) { showToast('입고일을 입력해주세요.', 'error'); return; }
+  if (!publisher) { showToast('제작사를 입력해주세요.', 'error'); return; }
+  if (!name) { showToast('상품명을 입력해주세요.', 'error'); return; }
+
+  var status = actualQty > 0 ? 'completed' : 'expected';
+
+  var records = getReceivingStore();
+  records.unshift({ date: date, publisher: publisher, name: name, expectedQty: expectedQty, actualQty: actualQty, status: status, checker: checker });
+  localStorage.setItem('gm_receiving', JSON.stringify(records));
+
+  // Update inventory stock if completed
+  if (status === 'completed' && actualQty > 0) {
+    var items = getInventoryStore();
+    var found = false;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].publisher === publisher && items[i].name === name) {
+        items[i].currentStock += actualQty;
+        items[i].lastReceived = date;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      items.push({ publisher: publisher, name: name, currentStock: actualQty, minStock: 10, lastReceived: date });
+    }
+    localStorage.setItem('gm_inventory', JSON.stringify(items));
+  }
+
+  closeModal('receiving-modal');
+  // Reset form
+  document.getElementById('recv-date').value = '';
+  document.getElementById('recv-publisher').value = '';
+  document.getElementById('recv-product-name').value = '';
+  document.getElementById('recv-expected-qty').value = '';
+  document.getElementById('recv-actual-qty').value = '';
+  document.getElementById('recv-checker').value = '';
+
+  showToast('입고가 등록되었습니다.', 'success');
+  loadInventory();
+}
+
+function deleteReceiving(idx) {
+  if (!confirm('이 입고 기록을 삭제하시겠습니까?')) return;
+  var records = getReceivingStore();
+  records.splice(idx, 1);
+  localStorage.setItem('gm_receiving', JSON.stringify(records));
+  showToast('입고 기록이 삭제되었습니다.', 'success');
+  renderReceiving();
+}
+
+function renderOrders() {
+  var orders = getOrderStore();
+  var tbody = document.getElementById('inventory-order-list');
+  if (!tbody) return;
+
+  if (orders.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">발주 요청이 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = orders.map(function(order, idx) {
+    var statusText, statusStyle;
+    if (order.status === 'requested') {
+      statusText = '요청'; statusStyle = 'background:var(--yellow-bg); color:#B8860B;';
+    } else if (order.status === 'ordered') {
+      statusText = '발주완료'; statusStyle = 'background:var(--blue-bg); color:var(--blue);';
+    } else {
+      statusText = '입고완료'; statusStyle = 'background:var(--green-bg); color:var(--green);';
+    }
+
+    return '<tr>' +
+      '<td style="font-size:13px;">' + order.date + '</td>' +
+      '<td>' + order.publisher + '</td>' +
+      '<td><strong>' + order.name + '</strong></td>' +
+      '<td>' + order.qty + '</td>' +
+      '<td><span style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; ' + statusStyle + '">' + statusText + '</span></td>' +
+      '<td style="font-size:13px;">' + (order.requester || '-') + '</td>' +
+      '<td>' +
+        (order.status === 'requested' ? '<button class="btn btn-ghost btn-sm" onclick="updateOrderStatus(' + idx + ', \'ordered\')" style="font-size:12px; color:var(--blue);">발주완료</button>' : '') +
+        (order.status === 'ordered' ? '<button class="btn btn-ghost btn-sm" onclick="updateOrderStatus(' + idx + ', \'received\')" style="font-size:12px; color:var(--green);">입고완료</button>' : '') +
+        '<button class="btn btn-ghost btn-sm" onclick="deleteOrder(' + idx + ')" style="color:var(--red); font-size:12px;">삭제</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function saveOrder() {
+  var publisher = document.getElementById('order-publisher').value.trim();
+  var name = document.getElementById('order-product-name').value.trim();
+  var qty = parseInt(document.getElementById('order-qty').value) || 0;
+  var requester = document.getElementById('order-requester').value.trim();
+
+  if (!publisher) { showToast('제작사를 입력해주세요.', 'error'); return; }
+  if (!name) { showToast('상품명을 입력해주세요.', 'error'); return; }
+  if (!qty) { showToast('요청수량을 입력해주세요.', 'error'); return; }
+
+  var orders = getOrderStore();
+  orders.unshift({
+    date: new Date().toISOString().split('T')[0],
+    publisher: publisher,
+    name: name,
+    qty: qty,
+    status: 'requested',
+    requester: requester
+  });
+  localStorage.setItem('gm_orders', JSON.stringify(orders));
+
+  closeModal('order-modal');
+  document.getElementById('order-publisher').value = '';
+  document.getElementById('order-product-name').value = '';
+  document.getElementById('order-qty').value = '';
+  document.getElementById('order-requester').value = '';
+
+  showToast('발주가 요청되었습니다.', 'success');
+  loadInventory();
+}
+
+function updateOrderStatus(idx, newStatus) {
+  var orders = getOrderStore();
+  if (orders[idx]) {
+    orders[idx].status = newStatus;
+    localStorage.setItem('gm_orders', JSON.stringify(orders));
+    showToast('상태가 변경되었습니다.', 'success');
+    renderOrders();
+  }
+}
+
+function deleteOrder(idx) {
+  if (!confirm('이 발주 요청을 삭제하시겠습니까?')) return;
+  var orders = getOrderStore();
+  orders.splice(idx, 1);
+  localStorage.setItem('gm_orders', JSON.stringify(orders));
+  showToast('발주 요청이 삭제되었습니다.', 'success');
+  renderOrders();
+}
+
+function checkLowStock() {
+  var items = getInventoryStore();
+  var lowItems = items.filter(function(item) {
+    return item.currentStock < item.minStock;
+  });
+  if (lowItems.length > 0) {
+    // Silent check - could show a notification badge if desired
+  }
 }
