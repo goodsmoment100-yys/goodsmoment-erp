@@ -322,8 +322,14 @@ async function loadApprovalApprovers() {
   if (!select) return;
   const { data } = await sb.from('profiles').select('id, name, role').order('name');
   if (!data) return;
-  select.innerHTML = '<option value="">자동 배정</option>' +
-    data.map(p => `<option value="${p.id}">${p.name}${p.role === 'ceo' ? ' (대표)' : p.role === 'admin' ? ' (본부장)' : ''}</option>`).join('');
+  // 결재자: 육연식(기본), 유희정만 표시
+  const approvers = data.filter(p => p.role === 'ceo' || p.name === '육연식' || p.name === '유희정');
+  if (approvers.length === 0) {
+    // 프로필에 없으면 전체 표시
+    select.innerHTML = data.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  } else {
+    select.innerHTML = approvers.map(p => `<option value="${p.id}" ${p.name === '육연식' ? 'selected' : ''}>${p.name} (대표)</option>`).join('');
+  }
 }
 
 async function loadApprovals(filter = 'all') {
