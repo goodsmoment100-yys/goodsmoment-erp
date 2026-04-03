@@ -556,11 +556,20 @@
                   <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
                     <div class="form-group">
                       <label style="font-size:12px;">1~3층 판매매출 (GM 25% 몫)</label>
-                      <input type="number" id="urban-store-sales" placeholder="0" oninput="calculateUrbanSettlement()" style="width:100%; padding:8px 10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                      <div style="display:flex; gap:4px;">
+                        <input type="number" id="urban-store-sales" placeholder="0" oninput="calculateUrbanSettlement()" style="flex:1; padding:8px 10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                        <button class="btn btn-ghost btn-sm" onclick="loadStoreSalesFromSettlement()" title="제작사 정산에서 가져오기" style="padding:8px; font-size:11px; white-space:nowrap;">가져오기</button>
+                      </div>
+                      <div style="font-size:11px; color:var(--gray-400); margin-top:4px;">※ 제작사 정산 완료 후 [가져오기] 클릭하면 자동 반영</div>
                     </div>
                     <div class="form-group">
                       <label style="font-size:12px;">가챠 매출 (22% 수수료)</label>
-                      <input type="number" id="urban-gacha-sales" placeholder="0" oninput="calculateUrbanSettlement()" style="width:100%; padding:8px 10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                      <div style="display:flex; gap:4px;">
+                        <input type="number" id="urban-gacha-sales" placeholder="0" oninput="calculateUrbanSettlement()" style="flex:1; padding:8px 10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('gacha-file-input').click()" title="가챠 엑셀 업로드" style="padding:8px; font-size:11px; white-space:nowrap;">엑셀</button>
+                        <input type="file" id="gacha-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleGachaUpload(this.files[0])">
+                      </div>
+                      <div style="font-size:11px; color:var(--gray-400); margin-top:4px;">※ 가챠 엑셀 업로드 또는 수기 입력 (22% 수수료 자동 계산)</div>
                     </div>
                   </div>
                   <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08);">
@@ -577,16 +586,19 @@
                       <label style="font-size:12px;">매장직 인건비</label>
                       <div style="display:flex; gap:4px;">
                         <input type="number" id="urban-labor-cost" placeholder="0" oninput="calculateUrbanSettlement()" style="flex:1; padding:8px 10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
-                        <button class="btn btn-ghost btn-sm" onclick="loadHRLaborCost()" title="인사관리에서 가져오기" style="padding:8px; font-size:11px; white-space:nowrap;">HR</button>
+                        <button class="btn btn-ghost btn-sm" onclick="loadHRLaborCost()" title="인사관리에서 가져오기" style="padding:8px; font-size:11px; white-space:nowrap;">가져오기</button>
                       </div>
+                      <div style="font-size:11px; color:var(--gray-400); margin-top:4px;">※ 인사관리에 급여 등록 후 [가져오기] 클릭</div>
                     </div>
                     <div class="form-group">
                       <label style="font-size:12px;">소모품비</label>
                       <input type="number" id="urban-supplies-cost" placeholder="0" oninput="calculateUrbanSettlement()" style="width:100%; padding:8px 10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                      <div style="font-size:11px; color:var(--gray-400); margin-top:4px;">※ 카드 영수증 합산 금액 수기 입력</div>
                     </div>
                     <div class="form-group">
-                      <label style="font-size:12px;">관리비</label>
+                      <label style="font-size:12px;">관리비 (전기/수도/CCTV 등)</label>
                       <input type="number" id="urban-mgmt-cost" placeholder="0" oninput="calculateUrbanSettlement()" style="width:100%; padding:8px 10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                      <div style="font-size:11px; color:var(--gray-400); margin-top:4px;">※ 월별 관리비 수기 입력</div>
                     </div>
                   </div>
                   <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08);">

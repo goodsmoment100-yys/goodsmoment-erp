@@ -620,6 +620,78 @@ function loadHRLaborCost() {
   }
 }
 
+// ---- 제작사 정산에서 매출 가져오기 ----
+function loadStoreSalesFromSettlement() {
+  const history = JSON.parse(localStorage.getItem('gm_settlement_history') || '{}');
+  const urbanMonth = document.getElementById('urban-settle-month') ? document.getElementById('urban-settle-month').value : '';
+
+  if (!urbanMonth) {
+    showToast('정산 월을 먼저 선택하세요.', 'error');
+    return;
+  }
+
+  const monthData = history[urbanMonth];
+  if (monthData && monthData.gmShare) {
+    document.getElementById('urban-store-sales').value = monthData.gmShare;
+    calculateUrbanSettlement();
+    showToast(urbanMonth.replace('-', '년 ') + '월 제작사 정산 데이터에서 가져왔습니다: ₩' + monthData.gmShare.toLocaleString(), 'success');
+  } else {
+    showToast(urbanMonth.replace('-', '년 ') + '월 제작사 정산 데이터가 없습니다. 제작사 정산을 먼저 실행하세요.', 'info');
+  }
+}
+
+// ---- 가챠 엑셀 업로드 ----
+function handleGachaUpload(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+      // 가챠 매출 합산 - 매출금액 컬럼 찾기
+      let totalGacha = 0;
+      let amountCol = -1;
+
+      for (let i = 0; i < Math.min(rows.length, 5); i++) {
+        rows[i].forEach((h, idx) => {
+          const hs = String(h).replace(/\n/g, '').trim();
+          if (hs === '금액' || hs === '매출' || hs.includes('매출') && hs.includes('금액')) amountCol = idx;
+        });
+        if (amountCol >= 0) break;
+      }
+
+      // 매출 컬럼 못 찾으면 마지막 숫자 컬럼 사용
+      if (amountCol === -1) {
+        // 가챠 형식: NO, 거래일자, 승인(건수,금액), 취소(건수,금액), 매출(건수,금액)
+        // 매출 금액은 보통 7번째 컬럼 (index 7)
+        amountCol = 7;
+      }
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0) continue;
+        const val = row[amountCol];
+        if (val === undefined || val === null) continue;
+        const num = typeof val === 'number' ? val : parseInt(String(val).replace(/[,₩\s]/g, '')) || 0;
+        if (num > 0) totalGacha += num;
+      }
+
+      // 22% 수수료 적용
+      const gachaCommission = Math.round(totalGacha * 0.22);
+
+      document.getElementById('urban-gacha-sales').value = gachaCommission;
+      calculateUrbanSettlement();
+      showToast('가챠 매출 ₩' + totalGacha.toLocaleString() + ' → 22% 수수료: ₩' + gachaCommission.toLocaleString(), 'success');
+    } catch (err) {
+      showToast('가챠 엑셀 읽기 실패: ' + err.message, 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 // ---- 어반플레이 정산서 다운로드 ----
 function downloadUrbanSettlement() {
   const monthInput = document.getElementById('urban-settle-month');
