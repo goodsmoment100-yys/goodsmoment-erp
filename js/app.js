@@ -4135,14 +4135,10 @@ function renderClientList() {
 
   tbody.innerHTML = clients.map((c, i) => `<tr style="cursor:pointer;" onclick="openClientModal(${i})">
     <td style="font-weight:600;">${c.name}</td>
-    <td>${c.bizNo || '-'}</td>
     <td>${statusBadge(c.status)}</td>
-    <td>${c.feeRate || '-'}</td>
-    <td style="font-size:12px;">${c.dataDate || '-'} / ${c.payDate || '-'}</td>
     <td>${c.contactName || '-'}</td>
     <td style="font-size:12px;">${c.contactEmail || '-'}</td>
     <td>${c.contactPhone || '-'}</td>
-    <td style="font-size:12px; color:var(--gray-500);">${c.memo || '-'}</td>
   </tr>`).join('');
 }
 
