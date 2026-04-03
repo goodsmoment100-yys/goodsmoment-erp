@@ -957,17 +957,25 @@ function renderMonthlyChart(year) {
 function renderPublisherSummary(year) {
   const history = getSettlementHistory();
   const byPublisher = {};
+  const byPublisherMonthly = {}; // 월별 상세 데이터
 
   Object.entries(history).forEach(([month, data]) => {
     if (!month.startsWith(year) || !data.publishers) return;
     data.publishers.forEach(function(pub) {
       if (!byPublisher[pub.name]) {
         byPublisher[pub.name] = { totalSales: 0, publisherShare: 0, gmShare: 0, count: 0 };
+        byPublisherMonthly[pub.name] = {};
       }
       byPublisher[pub.name].totalSales += pub.totalSales || 0;
       byPublisher[pub.name].publisherShare += pub.publisherShare || 0;
       byPublisher[pub.name].gmShare += pub.gmShare || 0;
       byPublisher[pub.name].count++;
+      // 월별 저장
+      byPublisherMonthly[pub.name][month] = {
+        totalSales: pub.totalSales || 0,
+        publisherShare: pub.publisherShare || 0,
+        gmShare: pub.gmShare || 0
+      };
     });
   });
 
@@ -985,17 +993,23 @@ function renderPublisherSummary(year) {
     return;
   }
 
+  // 월별 상세를 window에 저장 (토글용)
+  window._pubMonthly = byPublisherMonthly;
+  window._pubYear = year;
+
   tbody.innerHTML = sorted.map(function(entry) {
     var name = entry[0], v = entry[1];
     var pct = grandTotal.totalSales > 0 ? ((v.totalSales / grandTotal.totalSales) * 100).toFixed(1) : 0;
-    return '<tr>' +
-      '<td style="font-weight:600;">' + name + '</td>' +
+    var safeId = name.replace(/[^가-힣a-zA-Z0-9]/g, '_');
+    return '<tr style="cursor:pointer;" onclick="togglePublisherDetail(\'' + name + '\', \'' + safeId + '\')">' +
+      '<td style="font-weight:600;">▸ ' + name + '</td>' +
       '<td>₩' + v.totalSales.toLocaleString() + '</td>' +
       '<td style="color:var(--blue);">₩' + v.publisherShare.toLocaleString() + '</td>' +
       '<td style="color:var(--primary); font-weight:700;">₩' + v.gmShare.toLocaleString() + '</td>' +
       '<td>' + v.count + '회</td>' +
       '<td>' + pct + '%</td>' +
-    '</tr>';
+    '</tr>' +
+    '<tr id="pub-detail-' + safeId + '" style="display:none;"><td colspan="6" style="padding:0;"><div style="background:var(--gray-50); padding:12px 16px;" id="pub-detail-content-' + safeId + '"></div></td></tr>';
   }).join('');
 
   var elTotalSales = document.getElementById('report-pub-total-sales');
@@ -1004,6 +1018,64 @@ function renderPublisherSummary(year) {
   if (elTotalSales) elTotalSales.textContent = '₩' + grandTotal.totalSales.toLocaleString();
   if (elTotalShare) elTotalShare.textContent = '₩' + grandTotal.publisherShare.toLocaleString();
   if (elTotalGm) elTotalGm.textContent = '₩' + grandTotal.gmShare.toLocaleString();
+}
+
+// ---- 제작사 월별 상세 토글 ----
+function togglePublisherDetail(name, safeId) {
+  var row = document.getElementById('pub-detail-' + safeId);
+  var content = document.getElementById('pub-detail-content-' + safeId);
+  if (!row || !content) return;
+
+  if (row.style.display === 'none') {
+    row.style.display = '';
+    var monthly = (window._pubMonthly && window._pubMonthly[name]) || {};
+    var year = window._pubYear || '2026';
+
+    var months = [];
+    var maxSales = 0;
+    for (var m = 1; m <= 12; m++) {
+      var key = year + '-' + String(m).padStart(2, '0');
+      var d = monthly[key] || { totalSales: 0, publisherShare: 0, gmShare: 0 };
+      months.push({ month: m, label: m + '월', ...d });
+      if (d.totalSales > maxSales) maxSales = d.totalSales;
+    }
+
+    var totalSales = months.reduce(function(s, m) { return s + m.totalSales; }, 0);
+    var avgSales = Math.round(totalSales / (months.filter(function(m) { return m.totalSales > 0; }).length || 1));
+
+    var html = '<div style="font-size:14px; font-weight:700; margin-bottom:12px;">' + name + ' — ' + year + '년 월별 매출</div>';
+
+    // 바 차트
+    html += '<div style="display:flex; align-items:flex-end; gap:4px; height:120px; margin-bottom:12px;">';
+    months.forEach(function(m) {
+      var h = maxSales > 0 ? Math.max((m.totalSales / maxSales) * 100, 3) : 3;
+      var salesStr = m.totalSales > 0 ? '₩' + (m.totalSales / 10000).toFixed(0) + '만' : '-';
+      html += '<div style="flex:1; text-align:center; display:flex; flex-direction:column; justify-content:flex-end; height:100%;">' +
+        '<div style="background:' + (m.totalSales > 0 ? 'var(--primary)' : 'var(--gray-200)') + '; border-radius:3px 3px 0 0; height:' + h + '%; min-height:3px;"></div>' +
+        '<div style="font-size:10px; margin-top:2px;">' + m.label + '</div>' +
+        '<div style="font-size:9px; color:var(--gray-500);">' + salesStr + '</div>' +
+      '</div>';
+    });
+    html += '</div>';
+
+    // 월별 테이블
+    html += '<table style="width:100%; font-size:12px; min-width:auto;"><thead><tr><th>월</th><th>총매출</th><th>제작사 정산</th><th>GM 수익</th></tr></thead><tbody>';
+    months.forEach(function(m) {
+      if (m.totalSales === 0) return;
+      html += '<tr><td>' + m.label + '</td><td>₩' + m.totalSales.toLocaleString() + '</td><td>₩' + m.publisherShare.toLocaleString() + '</td><td style="color:var(--primary); font-weight:600;">₩' + m.gmShare.toLocaleString() + '</td></tr>';
+    });
+    html += '</tbody></table>';
+
+    // 요약
+    html += '<div style="display:flex; gap:16px; margin-top:12px; padding-top:8px; border-top:1px solid var(--gray-200); font-size:13px;">' +
+      '<div><span style="color:var(--gray-500);">합계:</span> <strong>₩' + totalSales.toLocaleString() + '</strong></div>' +
+      '<div><span style="color:var(--gray-500);">월평균:</span> <strong>₩' + avgSales.toLocaleString() + '</strong></div>' +
+    '</div>';
+
+    content.innerHTML = html;
+  } else {
+    row.style.display = 'none';
+  }
 }
 
 // ---- 어반플레이 정산 이력 테이블 ----
