@@ -1491,6 +1491,9 @@
             <h1>경영 리포트</h1>
             <div class="header-sub">매출, 정산, 비용 누적 현황</div>
           </div>
+          <div class="header-actions">
+            <button class="btn btn-secondary btn-sm" onclick="window.print()">인쇄 / PDF 저장</button>
+          </div>
         </div>
         <div class="page-body">
 
@@ -1572,19 +1575,56 @@
             </div>
           </div>
 
-          <!-- Section D: 비용 요약 -->
+          <!-- Section D: 비용/어반 월별 상세 -->
           <div class="card">
-            <div class="card-header"><h3>비용 요약</h3></div>
-            <div class="card-body">
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                <div>
-                  <div style="font-size:13px; color:var(--gray-500); margin-bottom:4px;">총 인건비 (올해)</div>
-                  <div style="font-size:24px; font-weight:800;" id="report-total-labor">-</div>
+            <div class="card-header"><h3>비용/어반플레이 월별 상세</h3></div>
+            <div class="card-body" style="padding:12px 16px;">
+              <!-- 요약 카드 -->
+              <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px;">
+                <div style="background:var(--primary-bg); padding:12px; border-radius:8px; text-align:center;">
+                  <div style="font-size:11px; color:var(--gray-500);" id="report-cost-label-labor">인건비</div>
+                  <div style="font-size:18px; font-weight:800; color:var(--primary);" id="report-total-labor">-</div>
                 </div>
-                <div>
-                  <div style="font-size:13px; color:var(--gray-500); margin-bottom:4px;">총 소모품비 (올해)</div>
-                  <div style="font-size:24px; font-weight:800;" id="report-total-supplies">-</div>
+                <div style="background:var(--yellow-bg); padding:12px; border-radius:8px; text-align:center;">
+                  <div style="font-size:11px; color:var(--gray-500);" id="report-cost-label-supplies">소모품비</div>
+                  <div style="font-size:18px; font-weight:800; color:#B8860B;" id="report-total-supplies">-</div>
                 </div>
+                <div style="background:var(--blue-bg); padding:12px; border-radius:8px; text-align:center;">
+                  <div style="font-size:11px; color:var(--gray-500);" id="report-cost-label-urban">어반 지급</div>
+                  <div style="font-size:18px; font-weight:800; color:var(--blue);" id="report-total-urban-pay">-</div>
+                </div>
+                <div style="background:var(--green-bg); padding:12px; border-radius:8px; text-align:center;">
+                  <div style="font-size:11px; color:var(--gray-500);" id="report-cost-label-gm">GM 순수익</div>
+                  <div style="font-size:18px; font-weight:800; color:var(--green);" id="report-total-gm-net">-</div>
+                </div>
+              </div>
+              <!-- 월별 테이블 -->
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>월</th>
+                      <th>매출</th>
+                      <th>인건비</th>
+                      <th>소모품비</th>
+                      <th>관리비</th>
+                      <th>어반 지급</th>
+                      <th>GM 순수익</th>
+                    </tr>
+                  </thead>
+                  <tbody id="report-cost-monthly-table"></tbody>
+                  <tfoot>
+                    <tr style="font-weight:800; background:var(--gray-50);">
+                      <td>합계</td>
+                      <td id="report-cost-foot-sales">-</td>
+                      <td id="report-cost-foot-labor">-</td>
+                      <td id="report-cost-foot-supplies">-</td>
+                      <td id="report-cost-foot-mgmt">-</td>
+                      <td id="report-cost-foot-urban">-</td>
+                      <td id="report-cost-foot-gm" style="color:var(--green);">-</td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
           </div>

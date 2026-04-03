@@ -1106,28 +1106,82 @@ function renderUrbanHistory(year) {
 
 // ---- 비용 요약 ----
 function renderCostSummary(year) {
-  // From HR data
+  const urbanHistory = JSON.parse(localStorage.getItem('gm_urban_history') || '{}');
+  const settlementHistory = getSettlementHistory();
+
+  // HR 월급 계산 (매월 동일하다고 가정)
   const hrData = JSON.parse(localStorage.getItem('gm_hr_data') || '{}');
-  let totalLabor = 0;
+  let monthlyLabor = 0;
   Object.values(hrData).forEach(function(staff) {
     if (staff.status === '퇴직' || staff.isPending) return;
     const pay = parseInt(staff.payAmount) || 0;
     const type = staff.payType || 'monthly';
-    totalLabor += type === 'hourly' || type === '시급' ? pay * 209 : pay;
+    monthlyLabor += type === 'hourly' || type === '시급' ? pay * 209 : pay;
   });
-  totalLabor *= 12; // annualize roughly
 
-  const el1 = document.getElementById('report-total-labor');
-  if (el1) el1.textContent = '₩' + totalLabor.toLocaleString();
+  // 월별 데이터 조합
+  var months = [];
+  var totals = { sales: 0, labor: 0, supplies: 0, mgmt: 0, urbanPay: 0, gmNet: 0 };
 
-  // Supplies from urban history
-  const urbanHistory = JSON.parse(localStorage.getItem('gm_urban_history') || '{}');
-  let totalSupplies = 0;
-  Object.entries(urbanHistory).forEach(function(entry) {
-    if (entry[0].startsWith(year)) {
-      totalSupplies += entry[1].suppliesCost || 0;
+  for (var m = 1; m <= 12; m++) {
+    var key = year + '-' + String(m).padStart(2, '0');
+    var urban = urbanHistory[key] || {};
+    var settle = settlementHistory[key] || {};
+
+    var sales = settle.totalSales || urban.revenue || 0;
+    var labor = urban.laborCost || (sales > 0 ? monthlyLabor : 0);
+    var supplies = urban.suppliesCost || 0;
+    var mgmt = urban.mgmtCost || 0;
+    var urbanPay = urban.totalPayment || 0;
+    var gmNet = urban.gmShare || 0;
+
+    if (sales > 0 || labor > 0 || urbanPay > 0) {
+      totals.sales += sales;
+      totals.labor += labor;
+      totals.supplies += supplies;
+      totals.mgmt += mgmt;
+      totals.urbanPay += urbanPay;
+      totals.gmNet += gmNet;
     }
-  });
-  const el2 = document.getElementById('report-total-supplies');
-  if (el2) el2.textContent = '₩' + totalSupplies.toLocaleString();
+
+    months.push({ month: m, label: m + '월', sales: sales, labor: labor, supplies: supplies, mgmt: mgmt, urbanPay: urbanPay, gmNet: gmNet });
+  }
+
+  // 요약 카드 업데이트
+  var fmt = function(n) { return '₩' + n.toLocaleString(); };
+  var el = function(id) { return document.getElementById(id); };
+  if (el('report-total-labor')) el('report-total-labor').textContent = fmt(totals.labor);
+  if (el('report-total-supplies')) el('report-total-supplies').textContent = fmt(totals.supplies);
+  if (el('report-total-urban-pay')) el('report-total-urban-pay').textContent = fmt(totals.urbanPay);
+  if (el('report-total-gm-net')) el('report-total-gm-net').textContent = fmt(totals.gmNet);
+
+  // 월별 테이블
+  var tbody = document.getElementById('report-cost-monthly-table');
+  if (!tbody) return;
+
+  var hasData = months.some(function(m) { return m.sales > 0 || m.labor > 0; });
+  if (!hasData) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">비용 데이터가 없습니다. 어반 정산을 실행하면 자동으로 누적됩니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = months.filter(function(m) { return m.sales > 0 || m.labor > 0 || m.urbanPay > 0; }).map(function(m) {
+    return '<tr>' +
+      '<td style="font-weight:600;">' + m.label + '</td>' +
+      '<td>' + fmt(m.sales) + '</td>' +
+      '<td>' + fmt(m.labor) + '</td>' +
+      '<td>' + fmt(m.supplies) + '</td>' +
+      '<td>' + fmt(m.mgmt) + '</td>' +
+      '<td style="color:var(--blue);">' + fmt(m.urbanPay) + '</td>' +
+      '<td style="color:var(--green); font-weight:700;">' + fmt(m.gmNet) + '</td>' +
+    '</tr>';
+  }).join('');
+
+  // 합계
+  if (el('report-cost-foot-sales')) el('report-cost-foot-sales').textContent = fmt(totals.sales);
+  if (el('report-cost-foot-labor')) el('report-cost-foot-labor').textContent = fmt(totals.labor);
+  if (el('report-cost-foot-supplies')) el('report-cost-foot-supplies').textContent = fmt(totals.supplies);
+  if (el('report-cost-foot-mgmt')) el('report-cost-foot-mgmt').textContent = fmt(totals.mgmt);
+  if (el('report-cost-foot-urban')) el('report-cost-foot-urban').textContent = fmt(totals.urbanPay);
+  if (el('report-cost-foot-gm')) el('report-cost-foot-gm').textContent = fmt(totals.gmNet);
 }
