@@ -1222,172 +1222,319 @@ function setScheduleStore(data) {
   localStorage.setItem('gm_schedule', JSON.stringify(data));
 }
 
+let scheduleGridData = {}; // { staffName: { '2026-04-01': 'O', '2026-04-02': '1', ... } }
+
 function loadSchedule() {
-  renderCalendar(scheduleYear, scheduleMonth);
+  const store = getScheduleStore();
+
+  // Convert from date-based to staff-based format
+  scheduleGridData = {};
+  Object.entries(store).forEach(([dateStr, entries]) => {
+    entries.forEach(entry => {
+      if (!scheduleGridData[entry.name]) scheduleGridData[entry.name] = {};
+      // Convert back to simple value
+      let val = entry.floor;
+      if (val === '전체') val = 'O';
+      else if (val.endsWith('층')) val = val.replace('층', '');
+      if (entry.startTime === '14:00') val = '4h';
+      scheduleGridData[entry.name][dateStr] = val;
+    });
+  });
+
+  // Also restore 휴무/연차 from the default staff data if first load
+  // Check if we have the known staff, add them if not
+  ['이슬M', '김형희', '문지민', '윤진별', '김아현PT'].forEach(name => {
+    if (!scheduleGridData[name]) scheduleGridData[name] = {};
+  });
+
+  renderScheduleGrid();
 }
 
 function prevMonth() {
   scheduleMonth--;
   if (scheduleMonth < 0) { scheduleMonth = 11; scheduleYear--; }
-  renderCalendar(scheduleYear, scheduleMonth);
+  renderScheduleGrid();
 }
 
 function nextMonth() {
   scheduleMonth++;
   if (scheduleMonth > 11) { scheduleMonth = 0; scheduleYear++; }
-  renderCalendar(scheduleYear, scheduleMonth);
+  renderScheduleGrid();
 }
 
-function renderCalendar(year, month) {
+function renderScheduleGrid() {
   const label = document.getElementById('schedule-month-label');
-  if (label) label.textContent = `${year}년 ${String(month + 1).padStart(2, '0')}월`;
+  if (label) label.textContent = `${scheduleYear}년 ${String(scheduleMonth + 1).padStart(2, '0')}월`;
 
-  const tbody = document.getElementById('schedule-calendar-body');
-  if (!tbody) return;
+  const container = document.getElementById('schedule-grid-container');
+  if (!container) return;
 
-  const store = getScheduleStore();
-  const firstDay = new Date(year, month, 1).getDay();
+  const year = scheduleYear;
+  const month = scheduleMonth;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
 
-  const badgeColors = ['#0d9488', '#6366f1', '#ec4899', '#f59e0b', '#8b5cf6', '#06b6d4', '#ef4444', '#84cc16'];
+  const dayNames = ['일','월','화','수','목','금','토'];
+  const staffNames = Object.keys(scheduleGridData);
 
-  let html = '';
-  let dayCount = 1;
-  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+  // Also load 휴무/연차 data from the defaults for this month
+  // We need to check if scheduleGridData has the off-day info
+  // The store only saves working entries, so we need to restore 휴무/연차 from getScheduleStore defaults
+  _restoreOffDays(year, month, daysInMonth);
 
-  for (let i = 0; i < totalCells; i++) {
-    if (i % 7 === 0) html += '<tr>';
+  let html = '<table style="font-size:12px; min-width:auto; border-collapse:collapse;">';
 
-    if (i < firstDay || dayCount > daysInMonth) {
-      html += '<td style="padding:8px; vertical-align:top; min-height:80px; height:90px; background:var(--gray-50);"></td>';
-    } else {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayCount).padStart(2, '0')}`;
-      const isToday = dateStr === todayStr;
-      const dayOfWeek = new Date(year, month, dayCount).getDay();
-      const isWednesday = dayOfWeek === 3;
-      const isSunday = dayOfWeek === 0;
+  // Header row: dates + day names
+  html += '<thead><tr><th style="position:sticky; left:0; background:white; z-index:2; min-width:70px; padding:4px 8px; border:1px solid var(--gray-200);">이름</th>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateObj = new Date(year, month, d);
+    const dow = dateObj.getDay();
+    const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const isWed = dow === 3;
+    const isToday = dateStr === todayStr;
+    const isSun = dow === 0;
+    const isSat = dow === 6;
 
-      let cellStyle = 'padding:8px; vertical-align:top; min-height:80px; height:90px; cursor:pointer; transition:background 0.15s;';
-      if (isToday) cellStyle += ' border:2px solid var(--primary); background:rgba(13,148,136,0.04);';
-      if (isWednesday) cellStyle += ' background:rgba(239,68,68,0.04);';
+    let style = 'text-align:center; min-width:36px; padding:4px 2px; border:1px solid var(--gray-200);';
+    if (isWed) style += 'background:#FEE;';
+    if (isToday) style += 'border:2px solid var(--primary);';
+    if (isSun) style += 'color:red;';
+    if (isSat) style += 'color:blue;';
 
-      const entries = store[dateStr] || [];
-      let badgesHtml = '';
+    html += '<th style="' + style + '">' + d + '<br><span style="font-size:10px; font-weight:400;">' + dayNames[dow] + '</span></th>';
+  }
+  html += '<th style="text-align:center; min-width:45px; padding:4px; border:1px solid var(--gray-200);">합계</th></tr></thead>';
 
-      if (isWednesday) {
-        badgesHtml += '<span style="display:inline-block; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:700; background:#fecaca; color:#dc2626; margin-top:4px;">휴무</span><br>';
+  // Staff rows
+  html += '<tbody>';
+  staffNames.forEach(name => {
+    html += '<tr>';
+    html += '<td style="position:sticky; left:0; background:white; z-index:1; font-weight:600; white-space:nowrap; padding:4px 8px; border:1px solid var(--gray-200); cursor:pointer;" onclick="renameScheduleStaff(\'' + name.replace(/'/g, "\\'") + '\')" title="클릭하여 이름 변경">' + name + '</td>';
+
+    let workDays = 0;
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateObj = new Date(year, month, d);
+      const dow = dateObj.getDay();
+      const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      const isWed = dow === 3;
+
+      let val = '';
+      if (isWed) {
+        val = '휴';
+      } else {
+        val = (scheduleGridData[name] && scheduleGridData[name][dateStr]) || '';
       }
 
-      entries.forEach((entry, idx) => {
-        const color = badgeColors[idx % badgeColors.length];
-        badgesHtml += `<span style="display:inline-block; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; background:${color}20; color:${color}; margin-top:2px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${entry.name} ${entry.startTime}~${entry.endTime} ${entry.floor}">${entry.name}</span><br>`;
-      });
+      if (val && val !== '휴' && val !== '휴무' && val !== '연차') workDays++;
 
-      const dateColor = isSunday ? 'var(--red)' : (dayOfWeek === 6 ? 'var(--blue)' : 'var(--gray-700)');
+      const cellStyle = getCellStyle(val, isWed);
+      const cellText = getCellText(val);
 
-      html += `<td style="${cellStyle}" onclick="openScheduleModal('${dateStr}')">
-        <div style="font-size:13px; font-weight:700; color:${dateColor}; margin-bottom:2px;">${dayCount}</div>
-        <div style="line-height:1.4;">${badgesHtml}</div>
-      </td>`;
-      dayCount++;
+      html += '<td style="text-align:center; padding:2px; cursor:pointer; border:1px solid var(--gray-200); ' + cellStyle + '" ' +
+        (isWed ? '' : 'onclick="cycleCell(\'' + name.replace(/'/g, "\\'") + '\',\'' + dateStr + '\', this)"') +
+        '>' + cellText + '</td>';
     }
 
-    if (i % 7 === 6) html += '</tr>';
-  }
+    html += '<td style="text-align:center; font-weight:700; padding:4px; border:1px solid var(--gray-200);">' + workDays + '일</td>';
+    html += '</tr>';
+  });
 
-  tbody.innerHTML = html;
-  calculateScheduleHours();
+  // Add staff row
+  html += '<tr><td colspan="' + (daysInMonth + 2) + '" style="text-align:center; padding:8px; cursor:pointer; color:var(--primary); font-weight:600; border:1px solid var(--gray-200);" onclick="addScheduleStaff()">+ 직원 추가</td></tr>';
+
+  html += '</tbody></table>';
+
+  container.innerHTML = html;
+
+  // Also update hours calculation
+  saveScheduleGrid();
+  if (typeof calculateScheduleHours === 'function') calculateScheduleHours();
 }
 
-async function openScheduleModal(dateStr) {
-  // Populate user dropdown from profiles
-  const userSelect = document.getElementById('schedule-user');
-  if (userSelect && userSelect.options.length <= 1) {
-    try {
-      const { data: members } = await sb.from('profiles').select('id, name, department').order('name');
-      if (members) {
-        userSelect.innerHTML = '<option value="">선택하세요</option>' +
-          members.map(m => `<option value="${m.id}" data-name="${m.name}">${m.name} (${m.department || '미지정'})</option>`).join('');
+function _restoreOffDays(year, month, daysInMonth) {
+  // Restore 휴무/연차 entries that are in the default data but not in store
+  // (since saveScheduleGrid skips 휴무/연차 when writing to store)
+  const defaultStaff2026_04 = {
+    '이슬M': {2:'연차',5:'휴무',8:'휴무',12:'휴무',19:'휴무',23:'연차',26:'휴무',27:'휴무'},
+    '김형희': {8:'휴무',9:'휴무',10:'연차',15:'휴무',16:'휴무',22:'휴무',29:'휴무'},
+    '문지민': {1:'휴무',7:'휴무',8:'휴무',14:'휴무',15:'휴무',22:'휴무',29:'휴무'},
+    '윤진별': {1:'휴무',4:'휴무',8:'휴무',11:'휴무',15:'휴무',21:'휴무',22:'휴무',27:'휴무'},
+    '김아현PT': {1:'휴무',3:'휴무',4:'휴무',5:'휴무',6:'휴무',8:'휴무',12:'휴무',14:'휴무',15:'휴무',17:'휴무',19:'휴무',20:'휴무',21:'휴무',22:'휴무',23:'휴무',29:'휴무',30:'휴무'}
+  };
+  const defaultStaff2026_05 = {
+    '이슬M': {3:'휴무',5:'휴무',7:'휴무',13:'휴무',14:'휴무',20:'휴무',21:'휴무',23:'휴무',24:'휴무',25:'휴무',27:'휴무',28:'휴무',31:'휴무'},
+    '김형희': {2:'휴무',8:'휴무',9:'휴무',15:'휴무',18:'휴무',20:'휴무',21:'휴무',22:'휴무',23:'휴무',24:'휴무',25:'휴무',27:'휴무'},
+    '문지민': {3:'휴무',4:'휴무',7:'휴무',8:'휴무',11:'휴무',12:'휴무',13:'휴무',18:'휴무',19:'휴무',20:'휴무',21:'휴무',27:'휴무',28:'휴무'},
+    '윤진별': {1:'휴무',5:'휴무',10:'휴무',11:'휴무',14:'휴무',16:'휴무',17:'휴무',19:'휴무',20:'휴무',25:'휴무',26:'휴무',27:'휴무',30:'휴무'},
+    '김아현PT': {1:'휴무',6:'휴무',10:'휴무',17:'휴무',18:'휴무',19:'휴무',20:'휴무',22:'휴무',25:'휴무',26:'휴무',27:'휴무',28:'휴무',29:'휴무'},
+    '차진아PT': {4:'휴무',7:'휴무',12:'휴무',16:'휴무',20:'휴무',21:'휴무',22:'휴무',27:'휴무',30:'휴무',31:'휴무'}
+  };
+
+  let defaults = null;
+  if (year === 2026 && month === 3) defaults = defaultStaff2026_04;
+  else if (year === 2026 && month === 4) defaults = defaultStaff2026_05;
+
+  if (!defaults) return;
+
+  for (const [name, days] of Object.entries(defaults)) {
+    if (!scheduleGridData[name]) scheduleGridData[name] = {};
+    for (const [d, val] of Object.entries(days)) {
+      const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(parseInt(d)).padStart(2, '0');
+      // Only set if not already set by user
+      if (!scheduleGridData[name][dateStr]) {
+        scheduleGridData[name][dateStr] = val;
       }
-    } catch (e) {
-      // If Supabase fails, keep existing options
     }
   }
-
-  if (dateStr) {
-    document.getElementById('schedule-date').value = dateStr;
-  } else {
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('schedule-date').value = today;
-  }
-
-  document.getElementById('schedule-start').value = '12:00';
-  document.getElementById('schedule-end').value = '20:00';
-  document.getElementById('schedule-floor').value = '전체';
-  document.getElementById('schedule-break').value = '60';
-  document.getElementById('schedule-memo').value = '';
-  if (userSelect) userSelect.value = '';
-
-  // Attach event listeners for modal hours tracking (remove old ones first)
-  const modalInputs = ['schedule-user', 'schedule-date', 'schedule-start', 'schedule-end', 'schedule-break'];
-  modalInputs.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.removeEventListener('change', updateScheduleModalHours);
-      el.addEventListener('change', updateScheduleModalHours);
-    }
-  });
-  // Also listen on input for time fields
-  ['schedule-start', 'schedule-end'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.removeEventListener('input', updateScheduleModalHours);
-      el.addEventListener('input', updateScheduleModalHours);
-    }
-  });
-
-  // Reset modal hours info
-  const infoEl = document.getElementById('schedule-modal-hours-info');
-  if (infoEl) infoEl.style.display = 'none';
-
-  openModal('schedule-modal');
 }
 
-function saveScheduleEntry() {
-  const dateStr = document.getElementById('schedule-date').value;
-  const userSelect = document.getElementById('schedule-user');
-  const userId = userSelect.value;
-  const selectedOption = userSelect.options[userSelect.selectedIndex];
-  const userName = selectedOption ? selectedOption.getAttribute('data-name') : '';
-  const startTime = document.getElementById('schedule-start').value;
-  const endTime = document.getElementById('schedule-end').value;
-  const floor = document.getElementById('schedule-floor').value;
-  const breakMin = parseInt(document.getElementById('schedule-break').value);
-  const memo = document.getElementById('schedule-memo').value.trim();
+function getCellStyle(val, isWed) {
+  if (isWed || val === '휴' || val === '휴무') return 'background:#F5F5F5; color:#999;';
+  if (val === '연차') return 'background:#FEF2F2; color:#DC2626;';
+  if (val === '4h') return 'background:#FFFBEB; color:#B8860B; font-weight:600;';
+  if (val === 'O') return 'background:rgba(46,196,182,0.1); color:var(--primary); font-weight:700;';
+  if (val === '1') return 'background:rgba(37,99,235,0.1); color:#2563EB; font-weight:700;';
+  if (val === '2') return 'background:rgba(22,163,74,0.1); color:#16A34A; font-weight:700;';
+  if (val === '3') return 'background:rgba(234,88,12,0.1); color:#EA580C; font-weight:700;';
+  if (val === '4') return 'background:rgba(147,51,234,0.1); color:#9333EA; font-weight:700;';
+  return '';
+}
 
-  if (!dateStr) { showToast('날짜를 선택해주세요.', 'error'); return; }
-  if (!userId) { showToast('직원을 선택해주세요.', 'error'); return; }
-  if (!startTime || !endTime) { showToast('근무시간을 입력해주세요.', 'error'); return; }
+function getCellText(val) {
+  if (!val) return '';
+  if (val === '휴' || val === '휴무') return '휴';
+  return val;
+}
 
-  const store = getScheduleStore();
-  if (!store[dateStr]) store[dateStr] = [];
+const CELL_CYCLE = ['', '1', '2', '3', '4', 'O', '4h', '휴무', '연차'];
 
-  store[dateStr].push({
-    userId: userId,
-    name: userName,
-    startTime: startTime,
-    endTime: endTime,
-    floor: floor,
-    breakMin: breakMin,
-    memo: memo
+function cycleCell(name, dateStr, td) {
+  const current = (scheduleGridData[name] && scheduleGridData[name][dateStr]) || '';
+  const idx = CELL_CYCLE.indexOf(current);
+  const next = CELL_CYCLE[(idx + 1) % CELL_CYCLE.length];
+
+  if (!scheduleGridData[name]) scheduleGridData[name] = {};
+  scheduleGridData[name][dateStr] = next;
+
+  td.textContent = getCellText(next);
+  td.style.cssText = 'text-align:center; padding:2px; cursor:pointer; border:1px solid var(--gray-200); ' + getCellStyle(next, false);
+
+  // Update work day count for this row
+  _updateRowTotal(td);
+
+  // Auto-save
+  saveScheduleGrid();
+  if (typeof calculateScheduleHours === 'function') calculateScheduleHours();
+}
+
+function _updateRowTotal(td) {
+  const row = td.parentElement;
+  if (!row) return;
+  const cells = row.querySelectorAll('td');
+  const nameCell = cells[0];
+  const name = nameCell.textContent;
+  const year = scheduleYear;
+  const month = scheduleMonth;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  let workDays = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = new Date(year, month, d).getDay();
+    if (dow === 3) continue; // Wednesday off
+    const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const val = (scheduleGridData[name] && scheduleGridData[name][dateStr]) || '';
+    if (val && val !== '휴무' && val !== '연차') workDays++;
+  }
+  const lastCell = cells[cells.length - 1];
+  if (lastCell) lastCell.textContent = workDays + '일';
+}
+
+function saveScheduleGrid() {
+  // Convert staff-based format back to date-based format for localStorage
+  const store = {};
+
+  Object.entries(scheduleGridData).forEach(([name, days]) => {
+    Object.entries(days).forEach(([dateStr, val]) => {
+      if (!val || val === '휴무' || val === '연차' || val === '휴') return;
+
+      if (!store[dateStr]) store[dateStr] = [];
+
+      let floor, startTime, endTime, breakMin;
+      if (val === '4h') {
+        floor = '전체'; startTime = '14:00'; endTime = '18:30'; breakMin = 30;
+      } else if (val === 'O') {
+        floor = '전체'; startTime = '11:30'; endTime = '20:30'; breakMin = 60;
+      } else {
+        floor = val + '층'; startTime = '11:30'; endTime = '20:30'; breakMin = 60;
+      }
+
+      store[dateStr].push({ name, floor, startTime, endTime, breakMin, memo: '' });
+    });
   });
 
   setScheduleStore(store);
-  closeModal('schedule-modal');
-  showToast('스케줄이 등록되었습니다.', 'success');
-  renderCalendar(scheduleYear, scheduleMonth);
+}
+
+function addScheduleStaff() {
+  const name = prompt('직원 이름을 입력하세요:');
+  if (!name || !name.trim()) return;
+  scheduleGridData[name.trim()] = {};
+  renderScheduleGrid();
+}
+
+function renameScheduleStaff(oldName) {
+  const newName = prompt('새 이름을 입력하세요:', oldName);
+  if (!newName || !newName.trim() || newName.trim() === oldName) return;
+  scheduleGridData[newName.trim()] = scheduleGridData[oldName];
+  delete scheduleGridData[oldName];
+  renderScheduleGrid();
+}
+
+function downloadScheduleExcel() {
+  const year = scheduleYear;
+  const month = scheduleMonth;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const dayNames = ['일','월','화','수','목','금','토'];
+  const monthStr = year + '년 ' + (month + 1) + '월';
+
+  const header1 = ['이름'];
+  const header2 = [''];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = new Date(year, month, d).getDay();
+    header1.push(d);
+    header2.push(dayNames[dow]);
+  }
+  header1.push('합계');
+  header2.push('');
+
+  const rows = [
+    [monthStr + ' 근무스케줄 (11:30-20:30 / 4h: 14:00-18:30)'],
+    [],
+    header1,
+    header2
+  ];
+
+  Object.entries(scheduleGridData).forEach(([name, days]) => {
+    const row = [name];
+    let workDays = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      const dow = new Date(year, month, d).getDay();
+      let val = dow === 3 ? '휴무' : (days[dateStr] || '');
+      if (val && val !== '휴무' && val !== '휴' && val !== '연차') workDays++;
+      row.push(val);
+    }
+    row.push(workDays + '일');
+    rows.push(row);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:10}].concat(Array(daysInMonth).fill({wch:5})).concat([{wch:6}]);
+  XLSX.utils.book_append_sheet(wb, ws, '근무스케줄');
+  XLSX.writeFile(wb, '굿즈모먼트_근무스케줄_' + monthStr.replace(/ /g, '') + '.xlsx');
+  showToast('스케줄 엑셀 다운로드 완료', 'success');
 }
 
 function calculateScheduleHours() {
@@ -1529,89 +1676,7 @@ function calculateScheduleHours() {
   }).join('');
 }
 
-function updateScheduleModalHours() {
-  const infoEl = document.getElementById('schedule-modal-hours-info');
-  if (!infoEl) return;
-
-  const userSelect = document.getElementById('schedule-user');
-  const dateInput = document.getElementById('schedule-date');
-  const startInput = document.getElementById('schedule-start');
-  const endInput = document.getElementById('schedule-end');
-  const breakSelect = document.getElementById('schedule-break');
-
-  if (!userSelect || !userSelect.value || !dateInput.value) {
-    infoEl.style.display = 'none';
-    return;
-  }
-
-  const selectedOption = userSelect.options[userSelect.selectedIndex];
-  const workerName = selectedOption ? selectedOption.getAttribute('data-name') : '';
-  if (!workerName) { infoEl.style.display = 'none'; return; }
-
-  const store = getScheduleStore();
-  const selectedDate = new Date(dateInput.value);
-  const dow = selectedDate.getDay();
-  const monOff = dow === 0 ? -6 : 1 - dow;
-  const monday = new Date(selectedDate);
-  monday.setDate(selectedDate.getDate() + monOff);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  const mondayStr = monday.toISOString().split('T')[0];
-  const sundayStr = sunday.toISOString().split('T')[0];
-
-  // Sum existing weekly hours for this worker
-  let existingWeekHours = 0;
-  for (const dateStr in store) {
-    if (dateStr >= mondayStr && dateStr <= sundayStr) {
-      (store[dateStr] || []).forEach(entry => {
-        if (entry.name === workerName) {
-          const [sh, sm] = entry.startTime.split(':').map(Number);
-          const [eh, em] = entry.endTime.split(':').map(Number);
-          const mins = (eh * 60 + em) - (sh * 60 + sm) - (entry.breakMin || 0);
-          existingWeekHours += Math.max(0, mins / 60);
-        }
-      });
-    }
-  }
-
-  // Calculate new entry hours
-  let newEntryHours = 0;
-  if (startInput.value && endInput.value) {
-    const [sh, sm] = startInput.value.split(':').map(Number);
-    const [eh, em] = endInput.value.split(':').map(Number);
-    const breakMin = parseInt(breakSelect.value) || 0;
-    newEntryHours = Math.max(0, ((eh * 60 + em) - (sh * 60 + sm) - breakMin) / 60);
-  }
-
-  const totalWeek = existingWeekHours + newEntryHours;
-
-  infoEl.style.display = 'block';
-  if (totalWeek > WEEKLY_LIMIT) {
-    infoEl.style.background = '#fecaca';
-    infoEl.style.color = '#dc2626';
-    infoEl.innerHTML = `&#9888;&#65039; <strong>${workerName}</strong>의 이번 주 누적: <strong>${totalWeek.toFixed(1)}시간</strong> (52시간 초과! 근로기준법 위반)`;
-  } else if (totalWeek > OVERTIME_THRESHOLD) {
-    infoEl.style.background = '#fef3c7';
-    infoEl.style.color = '#b45309';
-    infoEl.innerHTML = `<strong>${workerName}</strong>의 이번 주 누적: <strong>${totalWeek.toFixed(1)}시간</strong> (연장근무 ${(totalWeek - OVERTIME_THRESHOLD).toFixed(1)}시간 발생)`;
-  } else {
-    infoEl.style.background = '#d1fae5';
-    infoEl.style.color = '#047857';
-    infoEl.innerHTML = `<strong>${workerName}</strong>의 이번 주 누적: <strong>${totalWeek.toFixed(1)}시간</strong>`;
-  }
-}
-
-function deleteScheduleEntry(dateStr, index) {
-  if (!confirm('이 스케줄을 삭제하시겠습니까?')) return;
-  const store = getScheduleStore();
-  if (store[dateStr]) {
-    store[dateStr].splice(index, 1);
-    if (store[dateStr].length === 0) delete store[dateStr];
-    setScheduleStore(store);
-    showToast('스케줄이 삭제되었습니다.', 'success');
-    renderCalendar(scheduleYear, scheduleMonth);
-  }
-}
+// updateScheduleModalHours and deleteScheduleEntry removed - replaced by grid editor
 
 // ============================================
 // Resources (자료실)

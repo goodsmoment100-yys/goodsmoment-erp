@@ -923,43 +923,38 @@
       <div id="section-schedule" class="page-section" style="display:none;">
         <div class="page-header">
           <div>
-            <h1>근무 스케줄</h1>
-            <div class="header-sub">월별 매장 근무 배정표</div>
+            <h1>근무스케줄</h1>
+            <div class="header-sub">매장 월별 근무 배정표 — 셀 클릭으로 배정 (1~4층/O/4h/휴무/연차)</div>
           </div>
-          <div class="header-actions">
-            <div style="display:flex; align-items:center; gap:12px;">
-              <button class="btn btn-ghost btn-sm" onclick="prevMonth()" style="padding:6px 12px; font-size:18px;">&lt;</button>
-              <span id="schedule-month-label" style="font-size:16px; font-weight:700; min-width:140px; text-align:center;">2026년 04월</span>
-              <button class="btn btn-ghost btn-sm" onclick="nextMonth()" style="padding:6px 12px; font-size:18px;">&gt;</button>
+          <div class="header-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button class="btn btn-ghost btn-sm" onclick="prevMonth()">&#9664;</button>
+              <span id="schedule-month-label" style="font-size:16px; font-weight:700; min-width:120px; text-align:center;"></span>
+              <button class="btn btn-ghost btn-sm" onclick="nextMonth()">&#9654;</button>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="openScheduleModal()">
-              + 스케줄 등록
-            </button>
+            <button class="btn btn-primary btn-sm" onclick="downloadScheduleExcel()">엑셀 다운로드</button>
           </div>
         </div>
         <div class="page-body">
-          <div class="card">
-            <div class="table-container" style="overflow-x:auto;">
-              <table id="schedule-calendar" style="table-layout:fixed; width:100%;">
-                <thead>
-                  <tr>
-                    <th style="width:14.28%; text-align:center; color:var(--red);">일</th>
-                    <th style="width:14.28%; text-align:center;">월</th>
-                    <th style="width:14.28%; text-align:center;">화</th>
-                    <th style="width:14.28%; text-align:center; color:var(--red);">수</th>
-                    <th style="width:14.28%; text-align:center;">목</th>
-                    <th style="width:14.28%; text-align:center;">금</th>
-                    <th style="width:14.28%; text-align:center; color:var(--blue);">토</th>
-                  </tr>
-                </thead>
-                <tbody id="schedule-calendar-body">
-                </tbody>
-              </table>
-            </div>
+          <!-- Legend -->
+          <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px; font-size:12px;">
+            <span style="display:flex; align-items:center; gap:4px;"><span style="width:20px; height:16px; border-radius:3px; background:rgba(37,99,235,0.15); display:inline-block; text-align:center; font-size:10px; font-weight:700; color:#2563EB;">1</span> 1층</span>
+            <span style="display:flex; align-items:center; gap:4px;"><span style="width:20px; height:16px; border-radius:3px; background:rgba(22,163,74,0.15); display:inline-block; text-align:center; font-size:10px; font-weight:700; color:#16A34A;">2</span> 2층</span>
+            <span style="display:flex; align-items:center; gap:4px;"><span style="width:20px; height:16px; border-radius:3px; background:rgba(234,88,12,0.15); display:inline-block; text-align:center; font-size:10px; font-weight:700; color:#EA580C;">3</span> 3층</span>
+            <span style="display:flex; align-items:center; gap:4px;"><span style="width:20px; height:16px; border-radius:3px; background:rgba(147,51,234,0.15); display:inline-block; text-align:center; font-size:10px; font-weight:700; color:#9333EA;">4</span> 4층</span>
+            <span style="display:flex; align-items:center; gap:4px;"><span style="width:20px; height:16px; border-radius:3px; background:rgba(46,196,182,0.15); display:inline-block; text-align:center; font-size:10px; font-weight:700; color:var(--primary);">O</span> 전체</span>
+            <span style="display:flex; align-items:center; gap:4px;"><span style="width:20px; height:16px; border-radius:3px; background:#FFFBEB; display:inline-block; text-align:center; font-size:10px; font-weight:700; color:#B8860B;">4h</span> 반일</span>
+            <span style="display:flex; align-items:center; gap:4px;"><span style="width:20px; height:16px; border-radius:3px; background:#F5F5F5; display:inline-block; text-align:center; font-size:10px; color:#999;">휴</span> 휴무</span>
+            <span style="display:flex; align-items:center; gap:4px;"><span style="width:20px; height:16px; border-radius:3px; background:#FEF2F2; display:inline-block; text-align:center; font-size:10px; color:#DC2626;">연</span> 연차</span>
+          </div>
+
+          <!-- Schedule Grid -->
+          <div class="card" style="margin-bottom:16px;">
+            <div id="schedule-grid-container" style="overflow-x:auto; -webkit-overflow-scrolling:touch;"></div>
           </div>
 
           <!-- 주간 근무시간 현황 -->
-          <div class="card" style="margin-top:16px;">
+          <div class="card">
             <div class="card-header">
               <h3>주간 근무시간 현황</h3>
               <span style="font-size:12px; color:var(--gray-400);">근로기준법 기반 자동 계산</span>
@@ -1872,66 +1867,7 @@
     </div>
   </div>
 
-  <!-- Schedule Modal -->
-  <div class="modal-overlay" id="schedule-modal">
-    <div class="modal" style="max-width:480px;">
-      <div class="modal-header">
-        <h3>스케줄 등록</h3>
-        <button class="modal-close" onclick="closeModal('schedule-modal')">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>날짜</label>
-          <input type="date" id="schedule-date" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
-        </div>
-        <div class="form-group">
-          <label>직원 선택</label>
-          <select id="schedule-user" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
-            <option value="">선택하세요</option>
-          </select>
-        </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-          <div class="form-group">
-            <label>시작 시간</label>
-            <input type="time" id="schedule-start" value="12:00" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
-          </div>
-          <div class="form-group">
-            <label>종료 시간</label>
-            <input type="time" id="schedule-end" value="20:00" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
-          </div>
-        </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-          <div class="form-group">
-            <label>담당 층</label>
-            <select id="schedule-floor" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
-              <option value="전체">전체</option>
-              <option value="1층">1층</option>
-              <option value="2층">2층</option>
-              <option value="3층">3층</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>휴게시간</label>
-            <select id="schedule-break" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
-              <option value="30">30분</option>
-              <option value="60" selected>1시간</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>메모</label>
-          <textarea id="schedule-memo" placeholder="메모 (선택)" style="height:60px;"></textarea>
-        </div>
-        <!-- 주간 누적 근무시간 표시 -->
-        <div id="schedule-modal-hours-info" style="display:none; padding:10px 14px; border-radius:8px; margin-top:8px; font-size:13px; font-weight:600;">
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary btn-sm" onclick="closeModal('schedule-modal')">취소</button>
-        <button class="btn btn-primary btn-sm" onclick="saveScheduleEntry()">저장</button>
-      </div>
-    </div>
-  </div>
+  <!-- Schedule Modal removed - replaced by Excel-style grid editor -->
 
   <!-- Resource Modal -->
   <div class="modal-overlay" id="resource-modal">
