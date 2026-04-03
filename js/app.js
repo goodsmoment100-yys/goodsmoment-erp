@@ -431,8 +431,23 @@ async function createApproval(type, title, content, extras = {}) {
   }
 
   showToast('결재가 요청되었습니다.', 'success');
+
+  // 결재자에게 메시지 알림 보내기
+  const typeLabels = { leave: '연차 신청', vacation: '휴가 신청', expense: '지출 결의', purchase: '구매 요청', report: '업무 보고', other: '기타' };
+  const typeLabel = typeLabels[type] || type;
+  const msgStore = JSON.parse(localStorage.getItem('gm_messages') || '[]');
+  msgStore.unshift({
+    id: 'msg_' + Date.now(),
+    from: user.id,
+    fromName: user.profile?.name || '알수없음',
+    to: approverId,
+    toName: '결재자',
+    content: `[전자결재 알림] ${user.profile?.name || ''}님이 "${title}" (${typeLabel})을 결재 요청했습니다.`,
+    createdAt: new Date().toISOString()
+  });
+  localStorage.setItem('gm_messages', JSON.stringify(msgStore));
+
   closeModal('approval-modal');
-  // Reset form fields
   document.getElementById('approval-title').value = '';
   document.getElementById('approval-content').value = '';
   document.getElementById('approval-type').value = 'leave';
