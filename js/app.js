@@ -516,6 +516,7 @@ function navigateTo(page) {
     case 'notice': loadNotices(); break;
     case 'resources': break;
     case 'admin': loadMembers(); break;
+    case 'hr': loadHRList(); break;
   }
 }
 
@@ -673,4 +674,301 @@ function switchTab(tabGroup, tabName) {
   document.querySelectorAll(`[data-tab-content-group="${tabGroup}"] .tab-content`).forEach(el => {
     el.classList.toggle('active', el.dataset.tabContent === tabName);
   });
+}
+
+// ============================================
+// HR Management (인사관리)
+// ============================================
+
+// Get HR extra data from localStorage
+function getHRStore() {
+  try {
+    return JSON.parse(localStorage.getItem('gm_hr_data') || '{}');
+  } catch (e) {
+    return {};
+  }
+}
+
+function setHRStore(data) {
+  localStorage.setItem('gm_hr_data', JSON.stringify(data));
+}
+
+// Calculate monthly pay
+function calculateMonthlyPay(workHours, payType, payAmount) {
+  if (!payAmount) return 0;
+  if (payType === '시급') {
+    return Math.round(workHours * payAmount);
+  }
+  return payAmount; // 월급은 그대로
+}
+
+// Load HR list - merge profiles with localStorage HR data
+async function loadHRList() {
+  const user = await getCurrentUser();
+  if (!user) return;
+
+  if (!isManager(user)) {
+    const tbody = document.getElementById('hr-employee-list');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="empty-state">관리자 권한이 필요합니다.</td></tr>';
+    return;
+  }
+
+  // Get all profiles from Supabase
+  const { data: members } = await sb
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: true });
+
+  if (!members) return;
+
+  const hrStore = getHRStore();
+
+  // Get this month's attendance for pay calculation
+  const now = new Date();
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+  const { data: monthAttendance } = await sb
+    .from('attendance')
+    .select('user_id, work_hours')
+    .gte('date', firstDay)
+    .lte('date', lastDay)
+    .eq('status', 'done');
+
+  // Build work hours map
+  const workHoursMap = {};
+  if (monthAttendance) {
+    monthAttendance.forEach(a => {
+      if (!workHoursMap[a.user_id]) workHoursMap[a.user_id] = 0;
+      workHoursMap[a.user_id] += (a.work_hours || 0);
+    });
+  }
+
+  const roleMap = { ceo: '대표', admin: '관리자', manager: '팀장', member: '팀원' };
+
+  // Calculate stats
+  let totalPay = 0, salaryPay = 0, hourlyPay = 0, totalHours = 0, hourlyCount = 0;
+
+  const tbody = document.getElementById('hr-employee-list');
+  if (!tbody) return;
+
+  tbody.innerHTML = members.map(m => {
+    const hr = hrStore[m.id] || {};
+    const contractType = hr.contractType || '정규직';
+    const payType = hr.payType || '월급';
+    const payAmount = hr.payAmount || 0;
+    const joinDate = hr.joinDate || '-';
+    const phone = hr.phone || '-';
+    const status = hr.status || '재직';
+    const userHours = workHoursMap[m.id] || 0;
+
+    // Pay calculation
+    const monthPay = calculateMonthlyPay(userHours, payType, payAmount);
+    totalPay += monthPay;
+    if (payType === '월급') {
+      salaryPay += monthPay;
+    } else {
+      hourlyPay += monthPay;
+    }
+    totalHours += userHours;
+    if (userHours > 0) hourlyCount++;
+
+    const payDisplay = payAmount
+      ? (payType === '시급' ? payAmount.toLocaleString() + '원/시' : payAmount.toLocaleString() + '원/월')
+      : '-';
+
+    const statusClass = status === '재직' ? 'working' : 'off';
+
+    return `<tr>
+      <td><strong>${m.name}</strong></td>
+      <td>${m.department || '-'}</td>
+      <td>${roleMap[m.role] || m.role || '-'}</td>
+      <td>${contractType}</td>
+      <td>${payDisplay}</td>
+      <td>${joinDate}</td>
+      <td>${phone}</td>
+      <td><span class="status-badge ${statusClass}">${status}</span></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="openHRModal('${m.id}')">수정</button></td>
+    </tr>`;
+  }).join('');
+
+  // Update stats
+  const el = (id) => document.getElementById(id);
+  if (el('hr-stat-total-pay')) el('hr-stat-total-pay').textContent = totalPay.toLocaleString() + '원';
+  if (el('hr-stat-salary-pay')) el('hr-stat-salary-pay').textContent = salaryPay.toLocaleString() + '원';
+  if (el('hr-stat-hourly-pay')) el('hr-stat-hourly-pay').textContent = hourlyPay.toLocaleString() + '원';
+  if (el('hr-stat-avg-hours')) el('hr-stat-avg-hours').textContent = hourlyCount > 0 ? (totalHours / hourlyCount).toFixed(1) + '시간' : '-';
+
+  // Load leave summary
+  loadHRLeave(members, hrStore, workHoursMap);
+}
+
+// Load leave (연차) summary
+function loadHRLeave(members, hrStore, workHoursMap) {
+  const tbody = document.getElementById('hr-leave-list');
+  if (!tbody) return;
+
+  tbody.innerHTML = members.map(m => {
+    const hr = hrStore[m.id] || {};
+    const status = hr.status || '재직';
+    if (status === '퇴직') return '';
+
+    // Default 15 days annual leave, calculate used from attendance gaps
+    const totalLeave = hr.totalLeave || 15;
+    const usedLeave = hr.usedLeave || 0;
+    const remaining = totalLeave - usedLeave;
+
+    let leaveStatus = '';
+    if (remaining <= 0) {
+      leaveStatus = '<span class="status-badge off">소진</span>';
+    } else if (remaining <= 3) {
+      leaveStatus = '<span class="status-badge" style="background:var(--yellow-bg); color:#B8860B;">부족</span>';
+    } else {
+      leaveStatus = '<span class="status-badge working">정상</span>';
+    }
+
+    return `<tr>
+      <td><strong>${m.name}</strong></td>
+      <td>${totalLeave}일</td>
+      <td>${usedLeave}일</td>
+      <td>${remaining}일</td>
+      <td>${leaveStatus}</td>
+    </tr>`;
+  }).filter(Boolean).join('');
+
+  if (!tbody.innerHTML) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">연차 정보가 없습니다.</td></tr>';
+  }
+}
+
+// Open HR modal for new or edit
+async function openHRModal(userId) {
+  const titleEl = document.getElementById('hr-modal-title');
+
+  // Reset form
+  document.getElementById('hr-edit-user-id').value = '';
+  document.getElementById('hr-name').value = '';
+  document.getElementById('hr-email').value = '';
+  document.getElementById('hr-phone').value = '';
+  document.getElementById('hr-department').value = '';
+  document.getElementById('hr-role').value = 'member';
+  document.getElementById('hr-contract-type').value = '정규직';
+  document.getElementById('hr-pay-type').value = '월급';
+  document.getElementById('hr-pay-amount').value = '';
+  document.getElementById('hr-join-date').value = '';
+  document.getElementById('hr-status').value = '재직';
+  document.getElementById('hr-memo').value = '';
+
+  if (userId) {
+    // Edit mode - load existing data
+    titleEl.textContent = '직원 정보 수정';
+    document.getElementById('hr-edit-user-id').value = userId;
+
+    // Load from Supabase profile
+    const { data: profile } = await sb
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (profile) {
+      document.getElementById('hr-name').value = profile.name || '';
+      document.getElementById('hr-email').value = profile.email || '';
+      document.getElementById('hr-department').value = profile.department || '';
+      document.getElementById('hr-role').value = profile.role || 'member';
+    }
+
+    // Load from localStorage
+    const hrStore = getHRStore();
+    const hr = hrStore[userId] || {};
+    document.getElementById('hr-phone').value = hr.phone || '';
+    document.getElementById('hr-contract-type').value = hr.contractType || '정규직';
+    document.getElementById('hr-pay-type').value = hr.payType || '월급';
+    document.getElementById('hr-pay-amount').value = hr.payAmount || '';
+    document.getElementById('hr-join-date').value = hr.joinDate || '';
+    document.getElementById('hr-status').value = hr.status || '재직';
+    document.getElementById('hr-memo').value = hr.memo || '';
+  } else {
+    titleEl.textContent = '직원 등록';
+  }
+
+  openModal('hr-modal');
+}
+
+// Save HR data
+async function saveHRData() {
+  const userId = document.getElementById('hr-edit-user-id').value;
+  const name = document.getElementById('hr-name').value.trim();
+  const email = document.getElementById('hr-email').value.trim();
+  const phone = document.getElementById('hr-phone').value.trim();
+  const department = document.getElementById('hr-department').value;
+  const role = document.getElementById('hr-role').value;
+  const contractType = document.getElementById('hr-contract-type').value;
+  const payType = document.getElementById('hr-pay-type').value;
+  const payAmount = parseInt(document.getElementById('hr-pay-amount').value) || 0;
+  const joinDate = document.getElementById('hr-join-date').value;
+  const status = document.getElementById('hr-status').value;
+  const memo = document.getElementById('hr-memo').value.trim();
+
+  if (!name) {
+    showToast('이름을 입력해주세요.', 'error');
+    return;
+  }
+
+  if (userId) {
+    // Update existing profile in Supabase
+    const { error } = await sb
+      .from('profiles')
+      .update({ name, department, role })
+      .eq('id', userId);
+
+    if (error) {
+      showToast('프로필 업데이트 실패: ' + error.message, 'error');
+      return;
+    }
+
+    // Save extra HR data to localStorage
+    const hrStore = getHRStore();
+    hrStore[userId] = {
+      phone,
+      contractType,
+      payType,
+      payAmount,
+      joinDate,
+      status,
+      memo,
+      totalLeave: (hrStore[userId] && hrStore[userId].totalLeave) || 15,
+      usedLeave: (hrStore[userId] && hrStore[userId].usedLeave) || 0
+    };
+    setHRStore(hrStore);
+
+    showToast('직원 정보가 수정되었습니다.', 'success');
+  } else {
+    // New employee - cannot create Supabase auth user from client
+    // Store as pending in localStorage
+    const hrStore = getHRStore();
+    const tempId = 'temp_' + Date.now();
+    hrStore[tempId] = {
+      name,
+      email,
+      phone,
+      department,
+      role,
+      contractType,
+      payType,
+      payAmount,
+      joinDate,
+      status,
+      memo,
+      totalLeave: 15,
+      usedLeave: 0,
+      isPending: true
+    };
+    setHRStore(hrStore);
+
+    showToast('직원이 임시 등록되었습니다. (계정 생성은 별도 필요)', 'info');
+  }
+
+  closeModal('hr-modal');
+  loadHRList();
 }
