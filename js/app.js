@@ -2408,6 +2408,8 @@ const calCategoryLabels = {
 
 let calYear = new Date().getFullYear();
 let calMonth = new Date().getMonth(); // 0-indexed
+let calWeekDate = new Date(); // reference date for week view
+let calCurrentView = 'month'; // 'year', 'month', 'week'
 
 function getCalendarStore() {
   try {
@@ -2480,8 +2482,16 @@ function setCalendarStore(data) {
 }
 
 function loadCalendar() {
-  renderCalendarGrid(calYear, calMonth);
-  renderEventList(calYear, calMonth);
+  if (calCurrentView === 'year') {
+    renderYearView(calYear);
+    renderEventListForYear(calYear);
+  } else if (calCurrentView === 'week') {
+    renderWeekView(calWeekDate);
+    renderEventListForWeek(calWeekDate);
+  } else {
+    renderCalendarGrid(calYear, calMonth);
+    renderEventList(calYear, calMonth);
+  }
 }
 
 function prevCalMonth() {
@@ -2725,6 +2735,309 @@ function deleteCalendarEvent(id) {
   closeModal('calendar-modal');
   showToast('일정이 삭제되었습니다.', 'success');
   loadCalendar();
+}
+
+// ============================================
+// Calendar View Switching & Year/Week Views
+// ============================================
+
+function switchCalView(view) {
+  calCurrentView = view;
+
+  // Toggle view containers
+  const yearView = document.getElementById('cal-year-view');
+  const monthView = document.getElementById('cal-month-view');
+  const weekView = document.getElementById('cal-week-view');
+  if (yearView) yearView.style.display = view === 'year' ? '' : 'none';
+  if (monthView) monthView.style.display = view === 'month' ? '' : 'none';
+  if (weekView) weekView.style.display = view === 'week' ? '' : 'none';
+
+  // Toggle navigation
+  const navYear = document.getElementById('cal-nav-year');
+  const navMonth = document.getElementById('cal-nav-month');
+  const navWeek = document.getElementById('cal-nav-week');
+  if (navYear) navYear.style.display = view === 'year' ? 'flex' : 'none';
+  if (navMonth) navMonth.style.display = view === 'month' ? 'flex' : 'none';
+  if (navWeek) navWeek.style.display = view === 'week' ? 'flex' : 'none';
+
+  // Update button styles
+  const btnYear = document.getElementById('cal-view-year');
+  const btnMonth = document.getElementById('cal-view-month');
+  const btnWeek = document.getElementById('cal-view-week');
+  [btnYear, btnMonth, btnWeek].forEach(btn => {
+    if (btn) { btn.style.background = 'var(--gray-100)'; btn.style.color = 'var(--gray-600)'; }
+  });
+  const activeBtn = view === 'year' ? btnYear : (view === 'week' ? btnWeek : btnMonth);
+  if (activeBtn) { activeBtn.style.background = 'var(--primary)'; activeBtn.style.color = 'white'; }
+
+  // Update event list title
+  const listTitle = document.getElementById('cal-event-list-title');
+  if (listTitle) {
+    if (view === 'year') listTitle.textContent = '연간 일정 리스트';
+    else if (view === 'week') listTitle.textContent = '이번 주 일정 리스트';
+    else listTitle.textContent = '이번 달 일정 리스트';
+  }
+
+  // Sync dates between views
+  if (view === 'week') {
+    calWeekDate = new Date(calYear, calMonth, new Date().getDate());
+  }
+
+  loadCalendar();
+}
+
+function prevCalYear() {
+  calYear--;
+  loadCalendar();
+}
+
+function nextCalYear() {
+  calYear++;
+  loadCalendar();
+}
+
+function prevCalWeek() {
+  calWeekDate.setDate(calWeekDate.getDate() - 7);
+  loadCalendar();
+}
+
+function nextCalWeek() {
+  calWeekDate.setDate(calWeekDate.getDate() + 7);
+  loadCalendar();
+}
+
+function getWeekMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day; // Monday as start
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function renderYearView(year) {
+  const label = document.getElementById('cal-year-label');
+  if (label) label.textContent = `${year}년`;
+
+  const container = document.getElementById('cal-year-grid');
+  if (!container) return;
+
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+
+  let html = '<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px;">';
+
+  for (let m = 0; m < 12; m++) {
+    const firstDay = new Date(year, m, 1).getDay();
+    const daysInMonth = new Date(year, m + 1, 0).getDate();
+
+    html += `<div class="card" style="padding:12px;">`;
+    html += `<div style="font-weight:700; text-align:center; margin-bottom:8px; cursor:pointer; color:var(--primary);" onclick="calYear=${year}; calMonth=${m}; switchCalView('month');">${m + 1}월</div>`;
+
+    // Day name headers
+    html += '<div style="display:grid; grid-template-columns:repeat(7,1fr); gap:1px; font-size:9px; text-align:center; margin-bottom:2px;">';
+    dayNames.forEach((dn, di) => {
+      const color = di === 0 ? 'var(--red)' : (di === 6 ? 'var(--blue)' : 'var(--gray-400)');
+      html += `<div style="color:${color}; font-weight:600;">${dn}</div>`;
+    });
+    html += '</div>';
+
+    // Day grid
+    html += '<div style="display:grid; grid-template-columns:repeat(7,1fr); gap:1px; font-size:10px; text-align:center;">';
+
+    // Empty cells before first day
+    for (let i = 0; i < firstDay; i++) {
+      html += '<div style="padding:2px;"></div>';
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isToday = dateStr === todayStr;
+      const dayOfWeek = new Date(year, m, d).getDay();
+      const events = getEventsForDate(dateStr);
+
+      let cellStyle = 'padding:2px; cursor:pointer; border-radius:3px; position:relative;';
+      if (isToday) cellStyle += ' background:var(--primary); color:white; font-weight:700;';
+      else if (dayOfWeek === 0) cellStyle += ' color:var(--red);';
+      else if (dayOfWeek === 6) cellStyle += ' color:var(--blue);';
+
+      let dotHtml = '';
+      if (events.length > 0) {
+        const dotColor = events[0].color || '#6B7280';
+        dotHtml = `<div style="position:absolute; bottom:0; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:${dotColor};"></div>`;
+      }
+
+      html += `<div style="${cellStyle}" onclick="calYear=${year}; calMonth=${m}; switchCalView('month');" title="${events.length > 0 ? events.map(e => e.title).join(', ') : ''}">${d}${dotHtml}</div>`;
+    }
+
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderWeekView(date) {
+  const monday = getWeekMonday(date);
+  const container = document.getElementById('cal-week-grid');
+  if (!container) return;
+
+  // Update label
+  const label = document.getElementById('cal-week-label');
+  if (label) {
+    const weekEnd = new Date(monday);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const mStart = monday.getMonth() + 1;
+    const mEnd = weekEnd.getMonth() + 1;
+    const weekNum = Math.ceil(monday.getDate() / 7);
+    if (mStart === mEnd) {
+      label.textContent = `${monday.getFullYear()}년 ${String(mStart).padStart(2, '0')}월 ${weekNum}주`;
+    } else {
+      label.textContent = `${monday.getFullYear()}년 ${String(mStart).padStart(2, '0')}월 ~ ${String(mEnd).padStart(2, '0')}월`;
+    }
+  }
+
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+
+  let html = '<div style="display:grid; grid-template-columns:repeat(7,1fr); gap:8px;">';
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const isToday = dateStr === todayStr;
+    const dayOfWeek = d.getDay();
+    const isWednesday = dayOfWeek === 3;
+
+    const headerBg = isToday ? 'var(--primary)' : 'var(--gray-50)';
+    const headerColor = isToday ? 'white' : (dayOfWeek === 0 ? 'var(--red)' : (dayOfWeek === 6 ? 'var(--blue)' : 'var(--gray-700)'));
+    const borderStyle = isToday ? 'border:2px solid var(--primary);' : 'border:1px solid var(--gray-200);';
+
+    html += `<div style="min-height:300px; ${borderStyle} border-radius:10px; overflow:hidden;">`;
+    html += `<div style="text-align:center; padding:10px 8px; font-weight:700; background:${headerBg}; color:${headerColor};">`;
+    html += `${d.getMonth() + 1}/${d.getDate()}<br><span style="font-size:11px; font-weight:500;">${dayNames[i]}</span>`;
+    html += '</div>';
+
+    html += '<div style="padding:6px;">';
+
+    // Wednesday store closed banner
+    if (isWednesday) {
+      html += '<div style="padding:6px 8px; margin-bottom:6px; border-radius:6px; font-size:11px; font-weight:600; background:var(--gray-100); color:var(--gray-500); text-align:center;">매장 휴무</div>';
+    }
+
+    const events = getEventsForDate(dateStr);
+    events.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+    events.forEach(ev => {
+      const color = ev.color || calCategoryColors[ev.category] || '#6B7280';
+      const catLabel = calCategoryLabels[ev.category] || '';
+      html += `<div onclick="openCalendarModal(null, '${ev.id}')" style="padding:6px 8px; margin-bottom:4px; border-radius:6px; font-size:12px; background:${color}15; border-left:3px solid ${color}; cursor:pointer;" title="${ev.title}">`;
+      html += `<div style="font-weight:600; margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${ev.title}</div>`;
+      if (ev.time) html += `<span style="font-size:10px; color:var(--gray-500);">${ev.time}</span> `;
+      if (ev.location) html += `<span style="font-size:10px; color:var(--gray-400);">${ev.location}</span>`;
+      if (catLabel) html += `<div style="font-size:9px; color:${color}; margin-top:2px;">${catLabel}</div>`;
+      html += '</div>';
+    });
+
+    if (events.length === 0 && !isWednesday) {
+      html += '<div style="font-size:11px; color:var(--gray-300); text-align:center; padding:20px 0;">일정 없음</div>';
+    }
+
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderEventListForYear(year) {
+  const store = getCalendarStore();
+  const tbody = document.getElementById('cal-event-list');
+  const countEl = document.getElementById('cal-event-count');
+  if (!tbody) return;
+
+  const yearStart = `${year}-01-01`;
+  const yearEnd = `${year}-12-31`;
+
+  const filtered = store.filter(ev => {
+    const end = ev.endDate || ev.startDate;
+    return ev.startDate <= yearEnd && end >= yearStart;
+  }).sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+  if (countEl) countEl.textContent = filtered.length + '건';
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">등록된 일정이 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(ev => {
+    const color = ev.color || calCategoryColors[ev.category] || '#6B7280';
+    const catLabel = calCategoryLabels[ev.category] || ev.category;
+    const dateDisplay = ev.endDate && ev.endDate !== ev.startDate
+      ? ev.startDate + ' ~ ' + ev.endDate
+      : ev.startDate;
+
+    return `<tr>
+      <td style="font-size:13px; white-space:nowrap;">${dateDisplay}</td>
+      <td><span style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; background:${color}20; color:${color};">${catLabel}</span></td>
+      <td><strong>${ev.title}</strong></td>
+      <td style="font-size:13px; color:var(--gray-500);">${ev.location || '-'}</td>
+      <td style="font-size:13px; color:var(--gray-500);">${ev.time || '-'}</td>
+      <td style="font-size:13px;">${ev.manager || '-'}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="openCalendarModal(null, '${ev.id}')" style="font-size:12px;">수정</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderEventListForWeek(date) {
+  const monday = getWeekMonday(date);
+  const store = getCalendarStore();
+  const tbody = document.getElementById('cal-event-list');
+  const countEl = document.getElementById('cal-event-count');
+  if (!tbody) return;
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const weekStart = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+  const weekEnd = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`;
+
+  const filtered = store.filter(ev => {
+    const end = ev.endDate || ev.startDate;
+    return ev.startDate <= weekEnd && end >= weekStart;
+  }).sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+  if (countEl) countEl.textContent = filtered.length + '건';
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">등록된 일정이 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(ev => {
+    const color = ev.color || calCategoryColors[ev.category] || '#6B7280';
+    const catLabel = calCategoryLabels[ev.category] || ev.category;
+    const dateDisplay = ev.endDate && ev.endDate !== ev.startDate
+      ? ev.startDate + ' ~ ' + ev.endDate
+      : ev.startDate;
+
+    return `<tr>
+      <td style="font-size:13px; white-space:nowrap;">${dateDisplay}</td>
+      <td><span style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; background:${color}20; color:${color};">${catLabel}</span></td>
+      <td><strong>${ev.title}</strong></td>
+      <td style="font-size:13px; color:var(--gray-500);">${ev.location || '-'}</td>
+      <td style="font-size:13px; color:var(--gray-500);">${ev.time || '-'}</td>
+      <td style="font-size:13px;">${ev.manager || '-'}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="openCalendarModal(null, '${ev.id}')" style="font-size:12px;">수정</button>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 // ============================================

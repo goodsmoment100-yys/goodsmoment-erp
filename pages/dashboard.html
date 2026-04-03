@@ -1217,9 +1217,26 @@
           </div>
           <div class="header-actions">
             <div style="display:flex; align-items:center; gap:12px;">
-              <button class="btn btn-ghost btn-sm" onclick="prevCalMonth()" style="padding:6px 12px; font-size:18px;">&lt;</button>
-              <span id="cal-month-label" style="font-size:16px; font-weight:700; min-width:140px; text-align:center;">2026년 04월</span>
-              <button class="btn btn-ghost btn-sm" onclick="nextCalMonth()" style="padding:6px 12px; font-size:18px;">&gt;</button>
+              <div id="cal-nav-year" style="display:none; align-items:center; gap:8px;">
+                <button class="btn btn-ghost btn-sm" onclick="prevCalYear()" style="padding:6px 12px; font-size:18px;">&lt;</button>
+                <span id="cal-year-label" style="font-size:16px; font-weight:700; min-width:100px; text-align:center;">2026년</span>
+                <button class="btn btn-ghost btn-sm" onclick="nextCalYear()" style="padding:6px 12px; font-size:18px;">&gt;</button>
+              </div>
+              <div id="cal-nav-month" style="display:flex; align-items:center; gap:8px;">
+                <button class="btn btn-ghost btn-sm" onclick="prevCalMonth()" style="padding:6px 12px; font-size:18px;">&lt;</button>
+                <span id="cal-month-label" style="font-size:16px; font-weight:700; min-width:140px; text-align:center;">2026년 04월</span>
+                <button class="btn btn-ghost btn-sm" onclick="nextCalMonth()" style="padding:6px 12px; font-size:18px;">&gt;</button>
+              </div>
+              <div id="cal-nav-week" style="display:none; align-items:center; gap:8px;">
+                <button class="btn btn-ghost btn-sm" onclick="prevCalWeek()" style="padding:6px 12px; font-size:18px;">&lt;</button>
+                <span id="cal-week-label" style="font-size:16px; font-weight:700; min-width:180px; text-align:center;">2026년 04월 1주</span>
+                <button class="btn btn-ghost btn-sm" onclick="nextCalWeek()" style="padding:6px 12px; font-size:18px;">&gt;</button>
+              </div>
+            </div>
+            <div style="display:flex; gap:4px;">
+              <button class="btn btn-sm" id="cal-view-year" onclick="switchCalView('year')" style="background:var(--gray-100); color:var(--gray-600);">연간</button>
+              <button class="btn btn-sm" id="cal-view-month" onclick="switchCalView('month')" style="background:var(--primary); color:white;">월간</button>
+              <button class="btn btn-sm" id="cal-view-week" onclick="switchCalView('week')" style="background:var(--gray-100); color:var(--gray-600);">주간</button>
             </div>
             <button class="btn btn-primary btn-sm" onclick="openCalendarModal()">
               + 일정 등록
@@ -1238,31 +1255,43 @@
             <span style="display:flex; align-items:center; gap:5px; font-size:13px; font-weight:600;"><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#6B7280;"></span> 기타</span>
           </div>
 
-          <!-- Calendar Grid -->
-          <div class="card" style="margin-bottom:24px;">
-            <div class="table-container" style="overflow-x:auto;">
-              <table id="cal-grid-table" style="table-layout:fixed; width:100%;">
-                <thead>
-                  <tr>
-                    <th style="width:14.28%; text-align:center; color:var(--red);">일</th>
-                    <th style="width:14.28%; text-align:center;">월</th>
-                    <th style="width:14.28%; text-align:center;">화</th>
-                    <th style="width:14.28%; text-align:center;">수</th>
-                    <th style="width:14.28%; text-align:center;">목</th>
-                    <th style="width:14.28%; text-align:center;">금</th>
-                    <th style="width:14.28%; text-align:center; color:var(--blue);">토</th>
-                  </tr>
-                </thead>
-                <tbody id="cal-grid-body">
-                </tbody>
-              </table>
+          <!-- Year View -->
+          <div id="cal-year-view" style="display:none;">
+            <div id="cal-year-grid"></div>
+          </div>
+
+          <!-- Month View -->
+          <div id="cal-month-view">
+            <div class="card" style="margin-bottom:24px;">
+              <div class="table-container" style="overflow-x:auto;">
+                <table id="cal-grid-table" style="table-layout:fixed; width:100%;">
+                  <thead>
+                    <tr>
+                      <th style="width:14.28%; text-align:center; color:var(--red);">일</th>
+                      <th style="width:14.28%; text-align:center;">월</th>
+                      <th style="width:14.28%; text-align:center;">화</th>
+                      <th style="width:14.28%; text-align:center;">수</th>
+                      <th style="width:14.28%; text-align:center;">목</th>
+                      <th style="width:14.28%; text-align:center;">금</th>
+                      <th style="width:14.28%; text-align:center; color:var(--blue);">토</th>
+                    </tr>
+                  </thead>
+                  <tbody id="cal-grid-body">
+                  </tbody>
+                </table>
+              </div>
             </div>
+          </div>
+
+          <!-- Week View -->
+          <div id="cal-week-view" style="display:none;">
+            <div id="cal-week-grid"></div>
           </div>
 
           <!-- Event List for Month -->
           <div class="card">
             <div class="card-header">
-              <h3>이번 달 일정 리스트</h3>
+              <h3 id="cal-event-list-title">이번 달 일정 리스트</h3>
               <span style="font-size:12px; color:var(--gray-400);" id="cal-event-count">0건</span>
             </div>
             <div class="table-container">
