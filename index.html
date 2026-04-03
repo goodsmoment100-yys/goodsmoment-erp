@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GOODS MOMENT - Login</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-container">
+      <div class="login-logo">
+        <img src="logo_black.png" alt="GOODS MOMENT" style="height:60px; margin-bottom:16px;">
+        <p>Internal Management System</p>
+      </div>
+
+      <div class="login-error" id="login-error"></div>
+
+      <!-- Login Form -->
+      <div id="login-form">
+        <div class="form-group">
+          <label>이메일</label>
+          <input type="email" id="login-email" placeholder="name@birchsound.com">
+        </div>
+        <div class="form-group">
+          <label>비밀번호</label>
+          <input type="password" id="login-password" placeholder="비밀번호 입력">
+        </div>
+        <button class="btn btn-primary" onclick="handleLogin()">로그인</button>
+        <div class="login-footer">
+          <p style="margin-top:16px; color: var(--gray-500); font-size:13px;">
+            계정이 없으신가요? <a href="#" onclick="showSignup()">회원가입</a>
+          </p>
+        </div>
+      </div>
+
+      <!-- Signup Form -->
+      <div id="signup-form" style="display:none;">
+        <div class="form-group">
+          <label>이름</label>
+          <input type="text" id="signup-name" placeholder="홍길동">
+        </div>
+        <div class="form-group">
+          <label>부서</label>
+          <select id="signup-department">
+            <option value="">부서 선택</option>
+            <option value="경영">경영</option>
+            <option value="기획">기획</option>
+            <option value="제작">제작</option>
+            <option value="아티스트">아티스트</option>
+            <option value="마케팅">마케팅</option>
+            <option value="디자인">디자인</option>
+            <option value="기술">기술</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>이메일</label>
+          <input type="email" id="signup-email" placeholder="name@birchsound.com">
+        </div>
+        <div class="form-group">
+          <label>비밀번호</label>
+          <input type="password" id="signup-password" placeholder="6자 이상">
+        </div>
+        <button class="btn btn-primary" onclick="handleSignup()">회원가입</button>
+        <div class="login-footer">
+          <p style="margin-top:16px; color: var(--gray-500); font-size:13px;">
+            이미 계정이 있으신가요? <a href="#" onclick="showLogin()">로그인</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    // Check if already logged in
+    (async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        window.location.href = 'pages/dashboard.html';
+      }
+    })();
+
+    function showSignup() {
+      document.getElementById('login-form').style.display = 'none';
+      document.getElementById('signup-form').style.display = 'block';
+      document.getElementById('login-error').style.display = 'none';
+    }
+
+    function showLogin() {
+      document.getElementById('login-form').style.display = 'block';
+      document.getElementById('signup-form').style.display = 'none';
+      document.getElementById('login-error').style.display = 'none';
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('login-error');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    async function handleLogin() {
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+
+      if (!email || !password) {
+        showError('이메일과 비밀번호를 입력해주세요.');
+        return;
+      }
+
+      try {
+        await login(email, password);
+        window.location.href = 'pages/dashboard.html';
+      } catch (err) {
+        showError('로그인 실패: 이메일 또는 비밀번호를 확인해주세요.');
+      }
+    }
+
+    async function handleSignup() {
+      const name = document.getElementById('signup-name').value.trim();
+      const department = document.getElementById('signup-department').value;
+      const email = document.getElementById('signup-email').value.trim();
+      const password = document.getElementById('signup-password').value;
+
+      if (!name || !email || !password) {
+        showError('모든 필드를 입력해주세요.');
+        return;
+      }
+
+      if (password.length < 6) {
+        showError('비밀번호는 6자 이상이어야 합니다.');
+        return;
+      }
+
+      try {
+        await signup(email, password, name, department);
+        showError('');
+        document.getElementById('login-error').style.display = 'none';
+        alert('회원가입 완료! 이메일 인증 후 로그인해주세요.');
+        showLogin();
+      } catch (err) {
+        showError('회원가입 실패: ' + err.message);
+      }
+    }
+
+    // Enter key submit
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        if (document.getElementById('signup-form').style.display !== 'none') {
+          handleSignup();
+        } else {
+          handleLogin();
+        }
+      }
+    });
+  </script>
+</body>
+</html>

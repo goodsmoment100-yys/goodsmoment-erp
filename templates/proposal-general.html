@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GOODS MOMENT - 제안서</title>
+  <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+
+    :root {
+      --red: #FF3B30;
+      --red-dark: #E0342B;
+      --black: #0A0A0A;
+      --gray-100: #F2F2F2;
+      --gray-200: #E5E5E5;
+      --gray-400: #999;
+      --gray-500: #777;
+      --gray-600: #555;
+      --gray-700: #404040;
+      --white: #FFFFFF;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Pretendard Variable', 'Pretendard', -apple-system, sans-serif;
+      background: #CACACA;
+      color: var(--black);
+    }
+
+    .slide {
+      width: 1280px;
+      height: 720px;
+      background: var(--white);
+      margin: 40px auto;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+      page-break-after: always;
+    }
+
+    @media print {
+      body { background: white; }
+      .slide { margin: 0; box-shadow: none; page-break-after: always; page-break-inside: avoid; }
+      .no-print { display: none !important; }
+      @page { size: 1280px 720px; margin: 0; }
+    }
+
+    /* ---- COMMON SLIDE ELEMENTS ---- */
+    .slide-topbar { position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--red); }
+    .slide-logo { position: absolute; top: 32px; right: 40px; height: 20px; opacity: 0.5; }
+    .slide-pagenum { position: absolute; bottom: 28px; right: 40px; font-size: 12px; color: var(--gray-400); font-weight: 500; }
+    .slide-footer { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: var(--gray-200); }
+    .slide-footer-red { position: absolute; bottom: 0; left: 0; width: 120px; height: 3px; background: var(--red); }
+
+    .slide-title { font-size: 11px; font-weight: 700; color: var(--red); text-transform: uppercase; letter-spacing: 3px; margin-bottom: 8px; }
+    .slide-heading { font-size: 32px; font-weight: 800; color: var(--black); letter-spacing: -0.5px; margin-bottom: 48px; }
+
+    [contenteditable]:hover { outline: 2px dashed rgba(255,59,48,0.4); outline-offset: 4px; }
+    [contenteditable]:focus { outline: 2px solid var(--red); outline-offset: 4px; }
+
+    /* ============================================
+       SLIDE 1 - COVER (Minimal & Modern)
+       ============================================ */
+    .cover {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 80px;
+      background: var(--black);
+      color: var(--white);
+      position: relative;
+    }
+
+    .cover::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 40%;
+      height: 100%;
+      background: var(--red);
+      clip-path: polygon(30% 0, 100% 0, 100% 100%, 0% 100%);
+    }
+
+    .cover-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .cover-logo-area {
+      position: absolute;
+      top: 48px;
+      left: 80px;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .cover-logo-area img {
+      height: 28px;
+    }
+
+    .cover-badge {
+      position: absolute;
+      top: 48px;
+      right: 80px;
+      z-index: 2;
+      font-size: 12px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.7);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .cover h1 {
+      font-size: 52px;
+      font-weight: 900;
+      line-height: 1.15;
+      letter-spacing: -2px;
+      margin-bottom: 16px;
+    }
+
+    .cover h2 {
+      font-size: 20px;
+      font-weight: 400;
+      color: rgba(255,255,255,0.65);
+      margin-bottom: 48px;
+    }
+
+    .cover-meta-row {
+      display: flex;
+      gap: 48px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .cover-meta-row .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .cover-meta-row .meta-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--red);
+    }
+
+    .cover-meta-row .meta-value {
+      font-size: 14px;
+      color: rgba(255,255,255,0.85);
+      font-weight: 500;
+    }
+
+    /* ============================================
+       SLIDE 2 - CONTENTS
+       ============================================ */
+    .contents-slide { padding: 80px 80px; }
+
+    .contents-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 32px;
+    }
+
+    .contents-item { text-align: left; padding: 32px 0; border-top: 3px solid var(--gray-200); }
+    .contents-item:first-child { border-top-color: var(--red); }
+    .contents-num { font-size: 42px; font-weight: 900; color: var(--red); margin-bottom: 16px; line-height: 1; opacity: 0.2; }
+    .contents-item:first-child .contents-num { opacity: 1; }
+    .contents-label { font-size: 17px; font-weight: 700; color: var(--black); margin-bottom: 8px; }
+    .contents-desc { font-size: 13px; color: var(--gray-500); line-height: 1.6; }
+
+    /* ============================================
+       SLIDE 3 - ABOUT US
+       ============================================ */
+    .about-slide { padding: 80px 80px; display: flex; gap: 60px; }
+    .about-left { flex: 1; }
+
+    .about-text { font-size: 16px; color: var(--gray-700); line-height: 1.9; margin-bottom: 32px; }
+
+    .about-stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .about-stat { background: var(--gray-100); border-radius: 12px; padding: 28px; text-align: center; }
+    .about-stat .num { font-size: 28px; font-weight: 900; color: var(--red); }
+    .about-stat .label { font-size: 13px; color: var(--gray-600); margin-top: 4px; }
+
+    /* ============================================
+       SLIDE 4 - WHAT WE DO
+       ============================================ */
+    .services-slide { padding: 80px 80px; }
+
+    .services-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+
+    .service-card {
+      border: 1px solid var(--gray-200);
+      border-radius: 12px;
+      padding: 36px 28px;
+    }
+
+    .service-icon {
+      width: 48px; height: 48px;
+      background: rgba(255, 59, 48, 0.06);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px; font-size: 24px;
+    }
+
+    .service-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 10px; color: var(--black); }
+    .service-card p { font-size: 14px; color: var(--gray-500); line-height: 1.7; }
+
+    /* ============================================
+       SLIDE 5 - PROJECT OVERVIEW
+       ============================================ */
+    .project-slide { padding: 80px 80px; }
+    .project-info { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+    .project-detail { margin-bottom: 24px; }
+    .project-detail .label { font-size: 11px; font-weight: 700; color: var(--red); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+    .project-detail .value { font-size: 16px; color: var(--gray-700); line-height: 1.6; }
+
+    .highlight-box { background: var(--gray-100); border-radius: 12px; padding: 32px; }
+    .highlight-box h3 { font-size: 16px; font-weight: 700; color: var(--black); margin-bottom: 16px; }
+    .highlight-list { list-style: none; }
+    .highlight-list li { font-size: 14px; color: var(--gray-700); padding: 10px 0; border-bottom: 1px solid var(--gray-200); display: flex; align-items: center; gap: 10px; }
+    .highlight-list li:last-child { border-bottom: none; }
+    .highlight-list .dot { width: 6px; height: 6px; background: var(--red); border-radius: 50%; flex-shrink: 0; }
+
+    /* ============================================
+       SLIDE 6 - TIMELINE
+       ============================================ */
+    .timeline-slide { padding: 80px 80px; }
+
+    .timeline { display: flex; justify-content: space-between; position: relative; margin-top: 20px; }
+    .timeline::before { content: ''; position: absolute; top: 24px; left: 0; right: 0; height: 2px; background: var(--gray-200); }
+
+    .timeline-item { text-align: center; position: relative; flex: 1; }
+    .timeline-dot { width: 20px; height: 20px; background: var(--white); border: 3px solid var(--red); border-radius: 50%; margin: 14px auto 20px; position: relative; z-index: 1; }
+    .timeline-dot.filled { background: var(--red); }
+    .timeline-month { font-size: 14px; font-weight: 700; color: var(--black); }
+    .timeline-desc { font-size: 13px; color: var(--gray-500); margin-top: 8px; line-height: 1.6; padding: 0 16px; }
+
+    /* ============================================
+       SLIDE 7 - TEAM
+       ============================================ */
+    .team-slide { padding: 80px 80px; }
+    .team-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+    .team-member { text-align: center; }
+    .team-photo { width: 110px; height: 110px; background: var(--gray-100); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 800; color: var(--gray-400); }
+    .team-name { font-size: 16px; font-weight: 700; color: var(--black); margin-bottom: 4px; }
+    .team-role { font-size: 13px; color: var(--red); font-weight: 600; margin-bottom: 8px; }
+    .team-desc { font-size: 12px; color: var(--gray-500); line-height: 1.6; }
+
+    /* ============================================
+       SLIDE 8 - BUDGET
+       ============================================ */
+    .budget-slide { padding: 80px 80px; }
+
+    .budget-table { width: 100%; border-collapse: collapse; }
+    .budget-table thead th { text-align: left; padding: 16px 20px; font-size: 13px; font-weight: 700; color: var(--white); background: var(--black); text-transform: uppercase; letter-spacing: 0.5px; }
+    .budget-table thead th:first-child { border-radius: 8px 0 0 0; }
+    .budget-table thead th:last-child { border-radius: 0 8px 0 0; text-align: right; }
+    .budget-table tbody td { padding: 16px 20px; font-size: 15px; color: var(--gray-700); border-bottom: 1px solid var(--gray-200); }
+    .budget-table tbody td:last-child { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .budget-table tfoot td { padding: 16px 20px; font-size: 16px; font-weight: 800; color: var(--red); background: var(--gray-100); border-radius: 0 0 8px 8px; }
+    .budget-table tfoot td:last-child { text-align: right; }
+
+    /* ============================================
+       SLIDE 9 - THANK YOU
+       ============================================ */
+    .thankyou {
+      height: 100%;
+      background: var(--black);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .thankyou-center {
+      text-align: center;
+      color: var(--white);
+      z-index: 1;
+    }
+
+    .thankyou-center img {
+      height: 36px;
+      margin-bottom: 40px;
+    }
+
+    .thankyou-center h1 {
+      font-size: 56px;
+      font-weight: 900;
+      letter-spacing: -2px;
+      margin-bottom: 12px;
+    }
+
+    .thankyou-center .sub {
+      font-size: 17px;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 56px;
+      font-weight: 300;
+    }
+
+    .thankyou-contacts {
+      display: flex;
+      gap: 40px;
+      justify-content: center;
+    }
+
+    .thankyou-contact-item {
+      text-align: center;
+    }
+
+    .thankyou-contact-item .label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--red);
+      margin-bottom: 6px;
+    }
+
+    .thankyou-contact-item .value {
+      font-size: 14px;
+      color: rgba(255,255,255,0.7);
+      font-weight: 400;
+    }
+
+    .thankyou-line {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--red);
+    }
+
+    /* ---- TOOLBAR ---- */
+    .toolbar { position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; gap: 8px; }
+    .toolbar button { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .btn-print { background: var(--red); color: white; }
+    .btn-back { background: var(--black); color: white; }
+    /* ---- SLIDE CONTROLS ---- */
+    .slide { position: relative; }
+    .slide-controls {
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      z-index: 999; display: none; gap: 8px;
+      background: rgba(0,0,0,0.85); padding: 8px 16px; border-radius: 30px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .slide:hover .slide-controls { display: flex; align-items: center; }
+    .slide-ctrl-btn {
+      padding: 6px 16px; border: none; border-radius: 20px;
+      cursor: pointer; font-size: 13px; font-weight: 600; color: white;
+      font-family: inherit;
+    }
+    .slide-ctrl-btn.copy { background: #007AFF; }
+    .slide-ctrl-btn.delete { background: #FF3B30; }
+    .slide-ctrl-btn:hover { opacity: 0.85; }
+  </style>
+</head>
+<body>
+
+  <div class="toolbar no-print">
+    <button class="btn-back" onclick="history.back()">&#8592; 돌아가기</button>
+    <button class="btn-print" onclick="window.print()">PDF 저장 / 인쇄</button>
+  </div>
+
+  <!-- ===== SLIDE 1: COVER ===== -->
+  <div class="slide">
+    <div class="cover">
+      <div class="cover-logo-area">
+        <img src="../logo_white.png" alt="GOODS MOMENT">
+      </div>
+      <div class="cover-badge">Confidential</div>
+      <div class="cover-content">
+        <h1 contenteditable="true">프로젝트 제안서</h1>
+        <h2 contenteditable="true">글로벌 뮤직 페스티벌 협업 제안</h2>
+        <div class="cover-meta-row">
+          <div class="meta-item">
+            <span class="meta-label">Date</span>
+            <span class="meta-value" contenteditable="true">2026. 04. 03</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">To</span>
+            <span class="meta-value" contenteditable="true">[대상 기업/아티스트명]</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">From</span>
+            <span class="meta-value">GOODS MOMENT</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SLIDE 2: CONTENTS ===== -->
+  <div class="slide">
+    <div class="slide-topbar"></div>
+    <img src="../logo_black.png" class="slide-logo">
+    <div class="contents-slide">
+      <div class="slide-title">CONTENTS</div>
+      <div class="slide-heading">목차</div>
+      <div class="contents-grid">
+        <div class="contents-item">
+          <div class="contents-num">01</div>
+          <div class="contents-label" contenteditable="true">회사 소개</div>
+          <div class="contents-desc" contenteditable="true">GOODS MOMENT의 비전과 핵심 역량</div>
+        </div>
+        <div class="contents-item">
+          <div class="contents-num">02</div>
+          <div class="contents-label" contenteditable="true">사업 영역</div>
+          <div class="contents-desc" contenteditable="true">주요 서비스 및 사업 분야</div>
+        </div>
+        <div class="contents-item">
+          <div class="contents-num">03</div>
+          <div class="contents-label" contenteditable="true">프로젝트 개요</div>
+          <div class="contents-desc" contenteditable="true">페스티벌 컨셉, 규모, 일정</div>
+        </div>
+        <div class="contents-item">
+          <div class="contents-num">04</div>
+          <div class="contents-label" contenteditable="true">협업 제안</div>
+          <div class="contents-desc" contenteditable="true">파트너십 구조 및 기대효과</div>
+        </div>
+      </div>
+    </div>
+    <div class="slide-pagenum">02</div>
+    <div class="slide-footer"><div class="slide-footer-red"></div></div>
+  </div>
+
+  <!-- ===== SLIDE 3: ABOUT US ===== -->
+  <div class="slide">
+    <div class="slide-topbar"></div>
+    <img src="../logo_black.png" class="slide-logo">
+    <div class="about-slide">
+      <div class="about-left">
+        <div class="slide-title">ABOUT US</div>
+        <div class="slide-heading">회사 소개</div>
+        <p class="about-text" contenteditable="true">GOODS MOMENT는 글로벌 뮤직 페스티벌 기획 및 제작 전문 기업입니다. 각 분야 전문가들이 모여 음악을 중심으로 한 혁신적인 문화 경험을 만들어갑니다. 기술과 예술의 융합을 통해 관객에게 잊을 수 없는 순간을 선사합니다.</p>
+        <div class="about-stat-grid">
+          <div class="about-stat">
+            <div class="num" contenteditable="true">2026</div>
+            <div class="label">설립연도</div>
+          </div>
+          <div class="about-stat">
+            <div class="num" contenteditable="true">15+</div>
+            <div class="label">전문 인력</div>
+          </div>
+          <div class="about-stat">
+            <div class="num" contenteditable="true">Global</div>
+            <div class="label">사업 범위</div>
+          </div>
+          <div class="about-stat">
+            <div class="num" contenteditable="true">Music</div>
+            <div class="label">핵심 분야</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="slide-pagenum">03</div>
+    <div class="slide-footer"><div class="slide-footer-red"></div></div>
+  </div>
+
+  <!-- ===== SLIDE 4: WHAT WE DO ===== -->
+  <div class="slide">
+    <div class="slide-topbar"></div>
+    <img src="../logo_black.png" class="slide-logo">
+    <div class="services-slide">
+      <div class="slide-title">WHAT WE DO</div>
+      <div class="slide-heading">사업 영역</div>
+      <div class="services-grid">
+        <div class="service-card">
+          <div class="service-icon">&#127926;</div>
+          <h3 contenteditable="true">뮤직 페스티벌</h3>
+          <p contenteditable="true">글로벌 규모의 뮤직 페스티벌 기획, 제작, 운영. 세계적인 아티스트와 함께하는 음악 축제</p>
+        </div>
+        <div class="service-card">
+          <div class="service-icon">&#127911;</div>
+          <h3 contenteditable="true">아티스트 매니지먼트</h3>
+          <p contenteditable="true">아티스트 섭외, 협업, 매니지먼트. 글로벌 네트워크를 통한 최적의 라인업 구성</p>
+        </div>
+        <div class="service-card">
+          <div class="service-icon">&#127775;</div>
+          <h3 contenteditable="true">공연 제작</h3>
+          <p contenteditable="true">무대 디자인, 음향/조명, 미디어아트. 기술과 예술이 결합된 혁신적 공연 경험</p>
+        </div>
+      </div>
+    </div>
+    <div class="slide-pagenum">04</div>
+    <div class="slide-footer"><div class="slide-footer-red"></div></div>
+  </div>
+
+  <!-- ===== SLIDE 5: PROJECT OVERVIEW ===== -->
+  <div class="slide">
+    <div class="slide-topbar"></div>
+    <img src="../logo_black.png" class="slide-logo">
+    <div class="project-slide">
+      <div class="slide-title">PROJECT</div>
+      <div class="slide-heading">프로젝트 개요</div>
+      <div class="project-info">
+        <div>
+          <div class="project-detail">
+            <div class="label">프로젝트명</div>
+            <div class="value" contenteditable="true">[페스티벌/프로젝트명]</div>
+          </div>
+          <div class="project-detail">
+            <div class="label">일시</div>
+            <div class="value" contenteditable="true">2026년 00월 00일 ~ 00일</div>
+          </div>
+          <div class="project-detail">
+            <div class="label">장소</div>
+            <div class="value" contenteditable="true">[장소명]</div>
+          </div>
+          <div class="project-detail">
+            <div class="label">예상 규모</div>
+            <div class="value" contenteditable="true">관객 00,000명 / 아티스트 00팀</div>
+          </div>
+          <div class="project-detail">
+            <div class="label">컨셉</div>
+            <div class="value" contenteditable="true">[페스티벌 컨셉 설명]</div>
+          </div>
+        </div>
+        <div class="highlight-box">
+          <h3>핵심 포인트</h3>
+          <ul class="highlight-list">
+            <li><span class="dot"></span><span contenteditable="true">글로벌 TOP 아티스트 라인업</span></li>
+            <li><span class="dot"></span><span contenteditable="true">최첨단 무대/음향 시스템</span></li>
+            <li><span class="dot"></span><span contenteditable="true">미디어아트 융합 공연</span></li>
+            <li><span class="dot"></span><span contenteditable="true">VIP 라운지 및 프리미엄 경험</span></li>
+            <li><span class="dot"></span><span contenteditable="true">글로벌 미디어 노출</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="slide-pagenum">05</div>
+    <div class="slide-footer"><div class="slide-footer-red"></div></div>
+  </div>
+
+  <!-- ===== SLIDE 6: TIMELINE ===== -->
+  <div class="slide">
+    <div class="slide-topbar"></div>
+    <img src="../logo_black.png" class="slide-logo">
+    <div class="timeline-slide">
+      <div class="slide-title">TIMELINE</div>
+      <div class="slide-heading">추진 일정</div>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-month" contenteditable="true">4월</div>
+          <div class="timeline-dot filled"></div>
+          <div class="timeline-desc" contenteditable="true">기획 확정<br>파트너십 체결</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-month" contenteditable="true">5~6월</div>
+          <div class="timeline-dot filled"></div>
+          <div class="timeline-desc" contenteditable="true">아티스트 섭외<br>스폰서 확보</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-month" contenteditable="true">7~8월</div>
+          <div class="timeline-dot"></div>
+          <div class="timeline-desc" contenteditable="true">제작 준비<br>마케팅 시작</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-month" contenteditable="true">9~10월</div>
+          <div class="timeline-dot"></div>
+          <div class="timeline-desc" contenteditable="true">리허설<br>현장 세팅</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-month" contenteditable="true">11월</div>
+          <div class="timeline-dot"></div>
+          <div class="timeline-desc" contenteditable="true">D-DAY<br>페스티벌 개최</div>
+        </div>
+      </div>
+    </div>
+    <div class="slide-pagenum">06</div>
+    <div class="slide-footer"><div class="slide-footer-red"></div></div>
+  </div>
+
+  <!-- ===== SLIDE 7: TEAM ===== -->
+  <div class="slide">
+    <div class="slide-topbar"></div>
+    <img src="../logo_black.png" class="slide-logo">
+    <div class="team-slide">
+      <div class="slide-title">TEAM</div>
+      <div class="slide-heading">핵심 인력</div>
+      <div class="team-grid">
+        <div class="team-member">
+          <div class="team-photo">A</div>
+          <div class="team-name" contenteditable="true">홍길동</div>
+          <div class="team-role" contenteditable="true">대표이사 / 총괄</div>
+          <div class="team-desc" contenteditable="true">공연기획 20년 경력<br>글로벌 페스티벌 다수 제작</div>
+        </div>
+        <div class="team-member">
+          <div class="team-photo">B</div>
+          <div class="team-name" contenteditable="true">김철수</div>
+          <div class="team-role" contenteditable="true">프로듀서</div>
+          <div class="team-desc" contenteditable="true">음악 프로듀싱 전문<br>아티스트 네트워크 보유</div>
+        </div>
+        <div class="team-member">
+          <div class="team-photo">C</div>
+          <div class="team-name" contenteditable="true">이영희</div>
+          <div class="team-role" contenteditable="true">크리에이티브 디렉터</div>
+          <div class="team-desc" contenteditable="true">무대/공간 디자인<br>미디어아트 전문가</div>
+        </div>
+        <div class="team-member">
+          <div class="team-photo">D</div>
+          <div class="team-name" contenteditable="true">박지민</div>
+          <div class="team-role" contenteditable="true">마케팅 총괄</div>
+          <div class="team-desc" contenteditable="true">글로벌 마케팅 전략<br>미디어 네트워크</div>
+        </div>
+      </div>
+    </div>
+    <div class="slide-pagenum">07</div>
+    <div class="slide-footer"><div class="slide-footer-red"></div></div>
+  </div>
+
+  <!-- ===== SLIDE 8: BUDGET ===== -->
+  <div class="slide">
+    <div class="slide-topbar"></div>
+    <img src="../logo_black.png" class="slide-logo">
+    <div class="budget-slide">
+      <div class="slide-title">BUDGET</div>
+      <div class="slide-heading">예산 계획</div>
+      <table class="budget-table">
+        <thead>
+          <tr><th>항목</th><th>세부 내용</th><th>금액</th></tr>
+        </thead>
+        <tbody>
+          <tr><td contenteditable="true">아티스트 섭외</td><td contenteditable="true">메인 아티스트 + 서브 라인업</td><td contenteditable="true">000,000,000원</td></tr>
+          <tr><td contenteditable="true">무대/음향/조명</td><td contenteditable="true">메인 스테이지 + 서브 스테이지</td><td contenteditable="true">000,000,000원</td></tr>
+          <tr><td contenteditable="true">장소 임대</td><td contenteditable="true">장소 대관 및 시설 이용</td><td contenteditable="true">000,000,000원</td></tr>
+          <tr><td contenteditable="true">마케팅/홍보</td><td contenteditable="true">온오프라인 캠페인</td><td contenteditable="true">000,000,000원</td></tr>
+          <tr><td contenteditable="true">운영/인건비</td><td contenteditable="true">현장 스태프 및 보안</td><td contenteditable="true">000,000,000원</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td colspan="2">합계</td><td contenteditable="true">0,000,000,000원</td></tr>
+        </tfoot>
+      </table>
+    </div>
+    <div class="slide-pagenum">08</div>
+    <div class="slide-footer"><div class="slide-footer-red"></div></div>
+  </div>
+
+  <!-- ===== SLIDE 9: THANK YOU ===== -->
+  <div class="slide">
+    <div class="thankyou">
+      <div class="thankyou-center">
+        <img src="../logo_white.png" alt="GOODS MOMENT">
+        <h1>Thank You</h1>
+        <div class="sub" contenteditable="true">함께 만들어갈 특별한 무대를 기대합니다.</div>
+        <div class="thankyou-contacts">
+          <div class="thankyou-contact-item">
+            <div class="label">Phone</div>
+            <div class="value" contenteditable="true">010-0000-0000</div>
+          </div>
+          <div class="thankyou-contact-item">
+            <div class="label">Email</div>
+            <div class="value" contenteditable="true">contact@birchsound.com</div>
+          </div>
+          <div class="thankyou-contact-item">
+            <div class="label">Web</div>
+            <div class="value" contenteditable="true">www.birchsound.com</div>
+          </div>
+          <div class="thankyou-contact-item">
+            <div class="label">Address</div>
+            <div class="value" contenteditable="true">서울특별시 OO구 OO로</div>
+          </div>
+        </div>
+      </div>
+      <div class="thankyou-line"></div>
+    </div>
+  </div>
+
+  <!-- Hidden file input for image upload -->
+  <input type="file" id="img-upload" accept="image/*" style="display:none">
+
+  <script>
+    // ---- Add controls to every slide ----
+    document.querySelectorAll('.slide').forEach(slide => {
+      const controls = document.createElement('div');
+      controls.className = 'slide-controls no-print';
+      controls.innerHTML = `
+        <button class="slide-ctrl-btn copy" onclick="copySlide(this)">복제</button>
+        <button class="slide-ctrl-btn delete" onclick="deleteSlide(this)">삭제</button>
+      `;
+      slide.prepend(controls);
+    });
+
+    // ---- Copy slide ----
+    function copySlide(btn) {
+      const slide = btn.closest('.slide');
+      const clone = slide.cloneNode(true);
+      // Re-attach event listeners for new controls
+      clone.querySelector('.copy').onclick = function() { copySlide(this); };
+      clone.querySelector('.delete').onclick = function() { deleteSlide(this); };
+      // Insert after current slide
+      slide.after(clone);
+      updatePageNumbers();
+      clone.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // ---- Delete slide ----
+    function deleteSlide(btn) {
+      const slides = document.querySelectorAll('.slide');
+      if (slides.length <= 1) {
+        alert('최소 1페이지는 있어야 합니다.');
+        return;
+      }
+      if (confirm('이 페이지를 삭제할까요?')) {
+        btn.closest('.slide').remove();
+        updatePageNumbers();
+      }
+    }
+
+    // ---- Update page numbers ----
+    function updatePageNumbers() {
+      document.querySelectorAll('.slide').forEach((slide, i) => {
+        const pageNum = slide.querySelector('.slide-pagenum');
+        if (pageNum) {
+          pageNum.textContent = String(i + 1).padStart(2, '0');
+        }
+      });
+    }
+
+    // ---- Image drop & click on any slide ----
+    document.addEventListener('dragover', e => e.preventDefault());
+    document.addEventListener('drop', e => {
+      e.preventDefault();
+      const slide = e.target.closest('.slide');
+      if (!slide || !e.dataTransfer.files.length) return;
+      insertImage(slide, e.dataTransfer.files[0], e.offsetX, e.offsetY);
+    });
+
+    // Double-click on empty area to insert image
+    document.addEventListener('dblclick', e => {
+      const slide = e.target.closest('.slide');
+      if (!slide) return;
+      // Don't trigger on editable text
+      if (e.target.getAttribute('contenteditable') === 'true') return;
+      if (e.target.tagName === 'IMG' && e.target.classList.contains('inserted-img')) {
+        // Double click on existing image to replace
+        const input = document.getElementById('img-upload');
+        input.onchange = function() {
+          if (this.files[0]) {
+            const reader = new FileReader();
+            reader.onload = ev => { e.target.src = ev.target.result; };
+            reader.readAsDataURL(this.files[0]);
+          }
+        };
+        input.click();
+        return;
+      }
+      // Insert new image
+      const input = document.getElementById('img-upload');
+      input.onchange = function() {
+        if (this.files[0]) {
+          insertImage(slide, this.files[0]);
+        }
+      };
+      input.click();
+    });
+
+    function insertImage(slide, file, x, y) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.className = 'inserted-img';
+        img.style.cssText = `
+          max-width: 400px;
+          max-height: 300px;
+          border-radius: 8px;
+          cursor: move;
+          position: relative;
+          margin: 16px;
+        `;
+        img.title = '더블클릭: 이미지 교체 | 드래그: 이동';
+
+        // Find a good place to insert
+        const body = slide.querySelector('.about-slide, .services-slide, .project-slide, .timeline-slide, .team-slide, .budget-slide, .contents-slide');
+        if (body) {
+          body.appendChild(img);
+        } else {
+          slide.appendChild(img);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  </script>
+
+</body>
+</html>
