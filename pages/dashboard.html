@@ -241,42 +241,132 @@
         </div>
       </div>
 
-      <!-- ===== SETTLEMENT ===== -->
+      <!-- ===== SETTLEMENT (이지포스 정산 자동화) ===== -->
       <div id="section-settlement" class="page-section" style="display:none;">
         <div class="page-header">
           <div>
             <h1>정산</h1>
-            <div class="header-sub">프로젝트별 지출 및 정산 관리</div>
-          </div>
-          <div class="header-actions">
-            <button class="btn btn-primary btn-sm" onclick="openModal('settlement-modal')">
-              + 정산 등록
-            </button>
+            <div class="header-sub">이지포스 매출 데이터 → 제작사별 자동 정산</div>
           </div>
         </div>
         <div class="page-body">
-          <div class="card">
+
+          <!-- STEP 1: 엑셀 업로드 -->
+          <div id="settle-step1" class="card" style="margin-bottom:24px;">
             <div class="card-header">
-              <h3>정산 내역</h3>
+              <h3>1. 이지포스 엑셀 업로드</h3>
             </div>
-            <div class="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>날짜</th>
-                    <th>프로젝트</th>
-                    <th>내용</th>
-                    <th>금액</th>
-                    <th>등록자</th>
-                    <th>상태</th>
-                  </tr>
-                </thead>
-                <tbody id="settlement-list">
-                  <tr><td colspan="6" class="empty-state">정산 내역이 없습니다.</td></tr>
-                </tbody>
-              </table>
+            <div class="card-body">
+              <div id="settle-dropzone" style="border:2px dashed var(--gray-300); border-radius:12px; padding:48px; text-align:center; cursor:pointer; transition:all 0.2s;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5" style="margin-bottom:16px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <p style="font-size:16px; font-weight:600; color:var(--gray-700); margin-bottom:4px;">이지포스 엑셀 파일을 드래그하거나 클릭하세요</p>
+                <p style="font-size:13px; color:var(--gray-400);">특정기간 상품별 데이터 (.xlsx)</p>
+                <input type="file" id="settle-file-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleSettleFile(this.files[0])">
+              </div>
+              <div id="settle-file-info" style="display:none; margin-top:16px; padding:12px 16px; background:var(--green-bg); border-radius:8px; font-size:14px; color:var(--green);">
+                <span id="settle-file-name"></span> 로드 완료
+              </div>
             </div>
           </div>
+
+          <!-- STEP 2: 정산 설정 -->
+          <div id="settle-step2" style="display:none; margin-bottom:24px;">
+            <div class="card" style="margin-bottom:24px;">
+              <div class="card-header">
+                <h3>2. 정산 설정</h3>
+              </div>
+              <div class="card-body">
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:20px;">
+                  <div class="form-group">
+                    <label>정산 월</label>
+                    <input type="month" id="settle-month" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                  </div>
+                  <div class="form-group">
+                    <label>카드 결제대행 수수료 (%)</label>
+                    <input type="number" id="settle-card-fee" value="2.5" step="0.1" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                  </div>
+                  <div class="form-group">
+                    <label>데이터 유형</label>
+                    <select id="settle-data-type" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                      <option value="monthly">월간 상품별 (현금/카드 미구분)</option>
+                      <option value="daily">일별 데이터 (현금/카드 구분)</option>
+                    </select>
+                  </div>
+                </div>
+                <button class="btn btn-primary" onclick="runSettlement()" style="width:100%;">정산 계산 실행</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 3: 결과 -->
+          <div id="settle-step3" style="display:none;">
+            <!-- 전체 요약 -->
+            <div class="stats-grid" style="margin-bottom:24px;">
+              <div class="stat-card">
+                <div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+                <div class="stat-value" id="settle-total-sales">0</div>
+                <div class="stat-label">총 매출</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
+                <div class="stat-value" id="settle-card-sales">0</div>
+                <div class="stat-label">카드 매출</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+                <div class="stat-value" id="settle-cash-sales">0</div>
+                <div class="stat-label">현금 매출</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+                <div class="stat-value" id="settle-publisher-count">0</div>
+                <div class="stat-label">제작사 수</div>
+              </div>
+            </div>
+
+            <!-- 제작사별 정산 테이블 -->
+            <div class="card">
+              <div class="card-header">
+                <h3>제작사별 정산 결과</h3>
+                <button class="btn btn-primary btn-sm" onclick="downloadAllSettlements()">전체 정산서 다운로드 (Excel)</button>
+              </div>
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>제작사</th>
+                      <th>총매출</th>
+                      <th>순매출</th>
+                      <th>카드매출</th>
+                      <th>현금매출</th>
+                      <th>수수료 차감후</th>
+                      <th>제작사 몫</th>
+                      <th>굿즈모먼트 몫</th>
+                      <th>요율</th>
+                      <th>정산서</th>
+                    </tr>
+                  </thead>
+                  <tbody id="settle-result-table">
+                  </tbody>
+                  <tfoot>
+                    <tr style="font-weight:800; background:var(--gray-50);">
+                      <td>합계</td>
+                      <td id="settle-foot-total">-</td>
+                      <td id="settle-foot-net">-</td>
+                      <td id="settle-foot-card">-</td>
+                      <td id="settle-foot-cash">-</td>
+                      <td id="settle-foot-after">-</td>
+                      <td id="settle-foot-publisher">-</td>
+                      <td id="settle-foot-gm">-</td>
+                      <td>-</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -605,7 +695,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="../js/supabase-config.js"></script>
   <script src="../js/auth.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="../js/app.js"></script>
+  <script src="../js/settlement.js"></script>
   <script>
     // ---- Init ----
     (async () => {
