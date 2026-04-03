@@ -520,6 +520,7 @@ function navigateTo(page) {
     case 'hr': loadHRList(); break;
     case 'project': loadProjects(); break;
     case 'accounts': loadAccounts(); loadContacts(); loadParttimeContacts(); break;
+    case 'calendar': loadCalendar(); break;
   }
 }
 
@@ -2105,4 +2106,347 @@ function deleteParttimeContact(idx) {
   localStorage.setItem('gm_parttime_contacts', JSON.stringify(contacts));
   showToast('연락처가 삭제되었습니다.', 'success');
   loadParttimeContacts();
+}
+
+// ============================================
+// Calendar (전체 일정)
+// ============================================
+
+const calCategoryColors = {
+  popup: '#9333EA',
+  delivery: '#2563EB',
+  event: '#16A34A',
+  meeting: '#EAB308',
+  deadline: '#DC2626',
+  other: '#6B7280'
+};
+
+const calCategoryLabels = {
+  popup: '팝업',
+  delivery: '입고/발주',
+  event: '이벤트/프로모션',
+  meeting: '회의',
+  deadline: '마감/중요',
+  other: '기타'
+};
+
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth(); // 0-indexed
+
+function getCalendarStore() {
+  try {
+    const data = JSON.parse(localStorage.getItem('gm_calendar') || 'null');
+    if (data !== null) return data;
+  } catch (e) {}
+
+  // Pre-populate sample data
+  const defaults = [
+    {
+      id: 'cal_001',
+      title: '청춘블라썸 팝업',
+      category: 'popup',
+      startDate: '2026-04-01',
+      endDate: '2026-04-30',
+      time: '',
+      location: '4층',
+      manager: '이슬',
+      memo: '',
+      color: '#9333EA',
+      createdAt: '2026-03-25T00:00:00.000Z'
+    },
+    {
+      id: 'cal_002',
+      title: '화산귀환 팝업',
+      category: 'popup',
+      startDate: '2026-05-01',
+      endDate: '2026-05-17',
+      time: '',
+      location: '4층',
+      manager: '',
+      memo: '',
+      color: '#9333EA',
+      createdAt: '2026-03-25T00:00:00.000Z'
+    },
+    {
+      id: 'cal_003',
+      title: '4월 정산 마감',
+      category: 'deadline',
+      startDate: '2026-04-10',
+      endDate: '',
+      time: '',
+      location: '사무실',
+      manager: '박정미',
+      memo: '',
+      color: '#DC2626',
+      createdAt: '2026-03-25T00:00:00.000Z'
+    },
+    {
+      id: 'cal_004',
+      title: '제작사 미팅',
+      category: 'meeting',
+      startDate: '2026-04-15',
+      endDate: '',
+      time: '14:00',
+      location: '사무실',
+      manager: '육연식',
+      memo: '',
+      color: '#EAB308',
+      createdAt: '2026-03-25T00:00:00.000Z'
+    }
+  ];
+
+  localStorage.setItem('gm_calendar', JSON.stringify(defaults));
+  return defaults;
+}
+
+function setCalendarStore(data) {
+  localStorage.setItem('gm_calendar', JSON.stringify(data));
+}
+
+function loadCalendar() {
+  renderCalendarGrid(calYear, calMonth);
+  renderEventList(calYear, calMonth);
+}
+
+function prevCalMonth() {
+  calMonth--;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  loadCalendar();
+}
+
+function nextCalMonth() {
+  calMonth++;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  loadCalendar();
+}
+
+function getEventsForDate(dateStr) {
+  const store = getCalendarStore();
+  return store.filter(ev => {
+    const end = ev.endDate || ev.startDate;
+    return dateStr >= ev.startDate && dateStr <= end;
+  });
+}
+
+function renderCalendarGrid(year, month) {
+  const label = document.getElementById('cal-month-label');
+  if (label) label.textContent = `${year}년 ${String(month + 1).padStart(2, '0')}월`;
+
+  const tbody = document.getElementById('cal-grid-body');
+  if (!tbody) return;
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+
+  let html = '';
+  let dayCount = 1;
+  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+
+  for (let i = 0; i < totalCells; i++) {
+    if (i % 7 === 0) html += '<tr>';
+
+    if (i < firstDay || dayCount > daysInMonth) {
+      html += '<td style="padding:8px; vertical-align:top; min-height:80px; height:100px; background:var(--gray-50);"></td>';
+    } else {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayCount).padStart(2, '0')}`;
+      const isToday = dateStr === todayStr;
+      const dayOfWeek = new Date(year, month, dayCount).getDay();
+      const isSunday = dayOfWeek === 0;
+      const isSaturday = dayOfWeek === 6;
+
+      let cellStyle = 'padding:6px 8px; vertical-align:top; min-height:80px; height:100px; cursor:pointer; transition:background 0.15s;';
+      if (isToday) cellStyle += ' border:2px solid var(--primary); background:rgba(13,148,136,0.04);';
+
+      const events = getEventsForDate(dateStr);
+      let badgesHtml = '';
+
+      events.slice(0, 3).forEach(ev => {
+        const color = ev.color || calCategoryColors[ev.category] || '#6B7280';
+        const truncTitle = ev.title.length > 6 ? ev.title.substring(0, 6) + '..' : ev.title;
+        badgesHtml += `<div onclick="event.stopPropagation(); openCalendarModal(null, '${ev.id}')" style="display:block; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; background:${color}20; color:${color}; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;" title="${ev.title} | ${calCategoryLabels[ev.category] || ''} | ${ev.location || ''}">${truncTitle}</div>`;
+      });
+
+      if (events.length > 3) {
+        badgesHtml += `<div style="font-size:10px; color:var(--gray-400); margin-top:2px; text-align:center;">+${events.length - 3}건</div>`;
+      }
+
+      const dateColor = isSunday ? 'var(--red)' : (isSaturday ? 'var(--blue)' : 'var(--gray-700)');
+
+      html += `<td style="${cellStyle}" onclick="openCalendarModal('${dateStr}')">
+        <div style="font-size:13px; font-weight:700; color:${dateColor}; margin-bottom:2px;">${dayCount}</div>
+        <div style="line-height:1.3;">${badgesHtml}</div>
+      </td>`;
+      dayCount++;
+    }
+
+    if (i % 7 === 6) html += '</tr>';
+  }
+
+  tbody.innerHTML = html;
+}
+
+function renderEventList(year, month) {
+  const store = getCalendarStore();
+  const tbody = document.getElementById('cal-event-list');
+  const countEl = document.getElementById('cal-event-count');
+  if (!tbody) return;
+
+  // Get events that overlap this month
+  const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const monthEnd = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+  const filtered = store.filter(ev => {
+    const end = ev.endDate || ev.startDate;
+    return ev.startDate <= monthEnd && end >= monthStart;
+  }).sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+  if (countEl) countEl.textContent = filtered.length + '건';
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">등록된 일정이 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(ev => {
+    const color = ev.color || calCategoryColors[ev.category] || '#6B7280';
+    const catLabel = calCategoryLabels[ev.category] || ev.category;
+    const dateDisplay = ev.endDate && ev.endDate !== ev.startDate
+      ? ev.startDate + ' ~ ' + ev.endDate
+      : ev.startDate;
+
+    return `<tr>
+      <td style="font-size:13px; white-space:nowrap;">${dateDisplay}</td>
+      <td><span style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; background:${color}20; color:${color};">${catLabel}</span></td>
+      <td><strong>${ev.title}</strong></td>
+      <td style="font-size:13px; color:var(--gray-500);">${ev.location || '-'}</td>
+      <td style="font-size:13px; color:var(--gray-500);">${ev.time || '-'}</td>
+      <td style="font-size:13px;">${ev.manager || '-'}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="openCalendarModal(null, '${ev.id}')" style="font-size:12px;">수정</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openCalendarModal(dateStr, eventId) {
+  const titleEl = document.getElementById('calendar-modal-title');
+  const deleteBtn = document.getElementById('cal-delete-btn');
+
+  // Reset form
+  document.getElementById('cal-edit-id').value = '';
+  document.getElementById('cal-title').value = '';
+  document.getElementById('cal-category').value = 'popup';
+  document.getElementById('cal-start-date').value = dateStr || '';
+  document.getElementById('cal-end-date').value = '';
+  document.getElementById('cal-time').value = '';
+  document.getElementById('cal-location').value = '전체';
+  document.getElementById('cal-manager').value = '';
+  document.getElementById('cal-memo').value = '';
+  deleteBtn.style.display = 'none';
+  updateCalColor();
+
+  if (eventId) {
+    // Edit mode
+    titleEl.textContent = '일정 수정';
+    document.getElementById('cal-edit-id').value = eventId;
+    deleteBtn.style.display = 'inline-flex';
+
+    const store = getCalendarStore();
+    const ev = store.find(e => e.id === eventId);
+    if (ev) {
+      document.getElementById('cal-title').value = ev.title || '';
+      document.getElementById('cal-category').value = ev.category || 'popup';
+      document.getElementById('cal-start-date').value = ev.startDate || '';
+      document.getElementById('cal-end-date').value = ev.endDate || '';
+      document.getElementById('cal-time').value = ev.time || '';
+      document.getElementById('cal-location').value = ev.location || '전체';
+      document.getElementById('cal-manager').value = ev.manager || '';
+      document.getElementById('cal-memo').value = ev.memo || '';
+      updateCalColor();
+    }
+  } else {
+    titleEl.textContent = '일정 등록';
+  }
+
+  openModal('calendar-modal');
+}
+
+function updateCalColor() {
+  const category = document.getElementById('cal-category').value;
+  const color = calCategoryColors[category] || '#6B7280';
+  const label = calCategoryLabels[category] || '기타';
+  const preview = document.getElementById('cal-color-preview');
+  const labelEl = document.getElementById('cal-color-label');
+  if (preview) preview.style.background = color;
+  if (labelEl) labelEl.textContent = label;
+}
+
+function saveCalendarEvent() {
+  const editId = document.getElementById('cal-edit-id').value;
+  const title = document.getElementById('cal-title').value.trim();
+  const category = document.getElementById('cal-category').value;
+  const startDate = document.getElementById('cal-start-date').value;
+  const endDate = document.getElementById('cal-end-date').value;
+  const time = document.getElementById('cal-time').value;
+  const location = document.getElementById('cal-location').value;
+  const manager = document.getElementById('cal-manager').value.trim();
+  const memo = document.getElementById('cal-memo').value.trim();
+  const color = calCategoryColors[category] || '#6B7280';
+
+  if (!title) { showToast('제목을 입력해주세요.', 'error'); return; }
+  if (!startDate) { showToast('시작일을 입력해주세요.', 'error'); return; }
+
+  const store = getCalendarStore();
+
+  if (editId) {
+    const idx = store.findIndex(e => e.id === editId);
+    if (idx !== -1) {
+      store[idx].title = title;
+      store[idx].category = category;
+      store[idx].startDate = startDate;
+      store[idx].endDate = endDate;
+      store[idx].time = time;
+      store[idx].location = location;
+      store[idx].manager = manager;
+      store[idx].memo = memo;
+      store[idx].color = color;
+    }
+    showToast('일정이 수정되었습니다.', 'success');
+  } else {
+    store.push({
+      id: 'cal_' + Date.now(),
+      title,
+      category,
+      startDate,
+      endDate,
+      time,
+      location,
+      manager,
+      memo,
+      color,
+      createdAt: new Date().toISOString()
+    });
+    showToast('일정이 등록되었습니다.', 'success');
+  }
+
+  setCalendarStore(store);
+  closeModal('calendar-modal');
+  loadCalendar();
+}
+
+function deleteCalendarEvent(id) {
+  // If called from modal without id, get from hidden field
+  if (!id) id = document.getElementById('cal-edit-id').value;
+  if (!id) return;
+  if (!confirm('이 일정을 삭제하시겠습니까?')) return;
+
+  const store = getCalendarStore();
+  const filtered = store.filter(e => e.id !== id);
+  setCalendarStore(filtered);
+  closeModal('calendar-modal');
+  showToast('일정이 삭제되었습니다.', 'success');
+  loadCalendar();
 }

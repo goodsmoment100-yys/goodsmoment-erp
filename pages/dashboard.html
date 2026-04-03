@@ -31,6 +31,10 @@
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             출퇴근
           </a>
+          <a class="nav-item" data-page="calendar" onclick="navigateTo('calendar')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="16" y1="14" x2="16" y2="14.01"/><line x1="8" y1="18" x2="8" y2="18.01"/><line x1="12" y1="18" x2="12" y2="18.01"/></svg>
+            전체 일정
+          </a>
         </div>
 
         <div class="nav-section">
@@ -887,6 +891,86 @@
         </div>
       </div>
 
+      <!-- ===== CALENDAR (전체 일정) ===== -->
+      <div id="section-calendar" class="page-section" style="display:none;">
+        <div class="page-header">
+          <div>
+            <h1>전체 일정</h1>
+            <div class="header-sub">매장/사무실 공유 일정표</div>
+          </div>
+          <div class="header-actions">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <button class="btn btn-ghost btn-sm" onclick="prevCalMonth()" style="padding:6px 12px; font-size:18px;">&lt;</button>
+              <span id="cal-month-label" style="font-size:16px; font-weight:700; min-width:140px; text-align:center;">2026년 04월</span>
+              <button class="btn btn-ghost btn-sm" onclick="nextCalMonth()" style="padding:6px 12px; font-size:18px;">&gt;</button>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openCalendarModal()">
+              + 일정 등록
+            </button>
+          </div>
+        </div>
+        <div class="page-body">
+
+          <!-- Category Legend -->
+          <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px; padding:12px 16px; background:var(--gray-50); border-radius:10px;">
+            <span style="display:flex; align-items:center; gap:5px; font-size:13px; font-weight:600;"><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#9333EA;"></span> 팝업</span>
+            <span style="display:flex; align-items:center; gap:5px; font-size:13px; font-weight:600;"><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#2563EB;"></span> 입고/발주</span>
+            <span style="display:flex; align-items:center; gap:5px; font-size:13px; font-weight:600;"><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#16A34A;"></span> 이벤트/프로모션</span>
+            <span style="display:flex; align-items:center; gap:5px; font-size:13px; font-weight:600;"><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#EAB308;"></span> 회의</span>
+            <span style="display:flex; align-items:center; gap:5px; font-size:13px; font-weight:600;"><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#DC2626;"></span> 마감/중요</span>
+            <span style="display:flex; align-items:center; gap:5px; font-size:13px; font-weight:600;"><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#6B7280;"></span> 기타</span>
+          </div>
+
+          <!-- Calendar Grid -->
+          <div class="card" style="margin-bottom:24px;">
+            <div class="table-container" style="overflow-x:auto;">
+              <table id="cal-grid-table" style="table-layout:fixed; width:100%;">
+                <thead>
+                  <tr>
+                    <th style="width:14.28%; text-align:center; color:var(--red);">일</th>
+                    <th style="width:14.28%; text-align:center;">월</th>
+                    <th style="width:14.28%; text-align:center;">화</th>
+                    <th style="width:14.28%; text-align:center;">수</th>
+                    <th style="width:14.28%; text-align:center;">목</th>
+                    <th style="width:14.28%; text-align:center;">금</th>
+                    <th style="width:14.28%; text-align:center; color:var(--blue);">토</th>
+                  </tr>
+                </thead>
+                <tbody id="cal-grid-body">
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Event List for Month -->
+          <div class="card">
+            <div class="card-header">
+              <h3>이번 달 일정 리스트</h3>
+              <span style="font-size:12px; color:var(--gray-400);" id="cal-event-count">0건</span>
+            </div>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>날짜</th>
+                    <th>카테고리</th>
+                    <th>제목</th>
+                    <th>장소</th>
+                    <th>시간</th>
+                    <th>담당자</th>
+                    <th>관리</th>
+                  </tr>
+                </thead>
+                <tbody id="cal-event-list">
+                  <tr><td colspan="7" class="empty-state">등록된 일정이 없습니다.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
     </main>
   </div>
 
@@ -1391,6 +1475,79 @@
       <div class="modal-footer">
         <button class="btn btn-secondary btn-sm" onclick="closeModal('parttime-modal')">취소</button>
         <button class="btn btn-primary btn-sm" onclick="saveParttimeContact()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Calendar Modal -->
+  <div class="modal-overlay" id="calendar-modal">
+    <div class="modal" style="max-width:560px;">
+      <div class="modal-header">
+        <h3 id="calendar-modal-title">일정 등록</h3>
+        <button class="modal-close" onclick="closeModal('calendar-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="cal-edit-id">
+        <div class="form-group">
+          <label>제목</label>
+          <input type="text" id="cal-title" placeholder="일정 제목">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>카테고리</label>
+            <select id="cal-category" onchange="updateCalColor()" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+              <option value="popup">팝업</option>
+              <option value="delivery">입고/발주</option>
+              <option value="event">이벤트/프로모션</option>
+              <option value="meeting">회의</option>
+              <option value="deadline">마감/중요</option>
+              <option value="other">기타</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>장소</label>
+            <select id="cal-location" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+              <option value="1층">1층</option>
+              <option value="2층">2층</option>
+              <option value="3층">3층</option>
+              <option value="4층">4층</option>
+              <option value="사무실">사무실</option>
+              <option value="전체">전체</option>
+              <option value="기타">기타</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>시작일</label>
+            <input type="date" id="cal-start-date" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+          </div>
+          <div class="form-group">
+            <label>종료일 (선택)</label>
+            <input type="date" id="cal-end-date" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+          </div>
+          <div class="form-group">
+            <label>시간 (선택)</label>
+            <input type="time" id="cal-time" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+          </div>
+          <div class="form-group">
+            <label>담당자</label>
+            <input type="text" id="cal-manager" placeholder="담당자" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>내용/메모</label>
+          <textarea id="cal-memo" placeholder="메모 (선택)" style="height:60px;"></textarea>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--gray-500);">
+          <span>색상:</span>
+          <span id="cal-color-preview" style="display:inline-block; width:16px; height:16px; border-radius:50%; background:#9333EA;"></span>
+          <span id="cal-color-label">팝업</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost btn-sm" id="cal-delete-btn" onclick="deleteCalendarEvent()" style="color:var(--red); display:none;">삭제</button>
+        <div style="flex:1;"></div>
+        <button class="btn btn-secondary btn-sm" onclick="closeModal('calendar-modal')">취소</button>
+        <button class="btn btn-primary btn-sm" onclick="saveCalendarEvent()">저장</button>
       </div>
     </div>
   </div>
