@@ -519,6 +519,7 @@ function navigateTo(page) {
     case 'admin': loadMembers(); break;
     case 'hr': loadHRList(); break;
     case 'project': loadProjects(); break;
+    case 'accounts': loadAccounts(); loadContacts(); loadParttimeContacts(); break;
   }
 }
 
@@ -906,10 +907,66 @@ let scheduleMonth = new Date().getMonth(); // 0-indexed
 
 function getScheduleStore() {
   try {
-    return JSON.parse(localStorage.getItem('gm_schedule') || '{}');
-  } catch (e) {
-    return {};
+    const existing = JSON.parse(localStorage.getItem('gm_schedule') || 'null');
+    if (existing !== null) return existing;
+  } catch (e) {}
+
+  // Pre-populate April 2026 schedule data
+  const defaults = {};
+  const staff = {
+    '이슬M': {1:'O',2:'연차',3:'O',4:'3',5:'휴무',6:'O',7:'O',8:'휴무',9:'O',10:'2',11:'1',12:'휴무',13:'O',14:'O',15:'휴무',16:'O',17:'O',18:'O',19:'휴무',20:'1',21:'O',22:'1',23:'연차',24:'O',25:'O',26:'휴무',27:'휴무',28:'O',29:'3',30:'O'},
+    '김형희': {1:'3',2:'1',3:'1',4:'1',5:'1',6:'1',7:'1',8:'휴무',9:'휴무',10:'연차',11:'2',12:'2',13:'2',14:'2',15:'휴무',16:'휴무',17:'3',18:'3',19:'3',20:'3',21:'3',22:'휴무',23:'1',24:'1',25:'1',26:'1',27:'1',28:'',29:'휴무',30:'O'},
+    '문지민': {1:'휴무',2:'2',3:'2',4:'2',5:'2',6:'2',7:'휴무',8:'휴무',9:'3',10:'3',11:'3',12:'3',13:'3',14:'휴무',15:'휴무',16:'1',17:'1',18:'1',19:'1',20:'1',21:'2',22:'휴무',23:'3',24:'3',25:'3',26:'3',27:'3',28:'',29:'휴무',30:'O'},
+    '윤진별': {1:'휴무',2:'3',3:'3',4:'휴무',5:'3',6:'3',7:'3',8:'휴무',9:'1',10:'1',11:'휴무',12:'1',13:'1',14:'1',15:'휴무',16:'2',17:'2',18:'2',19:'2',20:'2',21:'휴무',22:'휴무',23:'2',24:'2',25:'2',26:'2',27:'휴무',28:'1',29:'O',30:'2'},
+    '김아현PT': {1:'휴무',2:'1',3:'휴무',4:'휴무',5:'휴무',6:'휴무',7:'2',8:'휴무',9:'2',10:'4h',11:'4h',12:'휴무',13:'3',14:'휴무',15:'휴무',16:'3',17:'휴무',18:'4h',19:'휴무',20:'휴무',21:'휴무',22:'휴무',23:'휴무',24:'4h',25:'4h',26:'2',27:'2',28:'',29:'휴무',30:'휴무'}
+  };
+
+  const wednesdays = [8, 15, 22, 29];
+
+  for (const [name, days] of Object.entries(staff)) {
+    for (let d = 1; d <= 30; d++) {
+      if (wednesdays.includes(d)) continue; // no entries on Wednesdays
+      const val = days[d];
+      if (!val || val === '휴무' || val === '연차') continue;
+
+      const dateStr = '2026-04-' + String(d).padStart(2, '0');
+      if (!defaults[dateStr]) defaults[dateStr] = [];
+
+      let floor, startTime, endTime, breakMin;
+
+      if (val === '4h') {
+        // 4h shift - use floor from context or default
+        floor = '전체';
+        startTime = '14:00';
+        endTime = '18:30';
+        breakMin = 30;
+      } else if (val === 'O') {
+        floor = '전체';
+        startTime = '11:30';
+        endTime = '20:30';
+        breakMin = 60;
+      } else {
+        // numeric floor
+        const floorNum = parseInt(val);
+        floor = floorNum + '층';
+        startTime = '11:30';
+        endTime = '20:30';
+        breakMin = 60;
+      }
+
+      defaults[dateStr].push({
+        name: name,
+        floor: floor,
+        startTime: startTime,
+        endTime: endTime,
+        breakMin: breakMin,
+        memo: ''
+      });
+    }
   }
+
+  localStorage.setItem('gm_schedule', JSON.stringify(defaults));
+  return defaults;
 }
 
 function setScheduleStore(data) {
@@ -1678,4 +1735,374 @@ function calculateProjectCost(project) {
     const estPay = days * 8 * (w.hourlyRate || 0); // 8 hours per day assumed
     return total + estPay;
   }, 0);
+}
+
+// ============================================
+// Accounts & Contacts (계정/연락처 관리)
+// ============================================
+
+function getAccountStore() {
+  try {
+    const data = JSON.parse(localStorage.getItem('gm_accounts') || 'null');
+    if (data !== null) return data;
+  } catch (e) {}
+
+  // Default accounts
+  const defaults = [
+    { name: '잡코리아/알바몬', purpose: '채용 사이트', username: 'goodsmoment', password: 'goods151', manager: '박정미 본부장' },
+    { name: '공용 이메일', purpose: '컨택 등', username: 'biz@goodsmoment.com', password: 'goods151151', manager: '박정미 본부장' },
+    { name: '공용 이메일', purpose: 'CS응대', username: 'cs@goodsmoment.com', password: 'goods151151', manager: '박정미 본부장' },
+    { name: '홈택스', purpose: '세무', username: 'goodsmoment@hometax.go.kr', password: '', manager: '박정미 본부장' },
+    { name: '싸인오케이', purpose: '전자계약', username: 'goodsmoment100@gmail.com', password: '85748574tt*', manager: '' },
+    { name: '애플', purpose: 'SNS 운영용', username: '공용 이메일 연동', password: 'Goods151!', manager: '이다비 디자이너' },
+    { name: '네이버', purpose: '', username: 'goodsmoment', password: 'goods151!', manager: '이슬 PM' },
+    { name: '트위터(X)', purpose: '', username: 'goods_moment', password: 'Goods151!', manager: '이다비 디자이너' },
+    { name: '인스타그램', purpose: '', username: 'goods_moment', password: '!o9o9o9o9', manager: '이다비 디자이너' },
+    { name: '이지포스', purpose: '매장 포스', username: '2508803575', password: '1769', manager: '' },
+    { name: '네이버 스마트플레이스', purpose: '예약', username: 'forrest777', password: 'goods151!', manager: '' },
+    { name: '와우프레스', purpose: '발주', username: 'goodsmoment', password: '17691769yys*', manager: '' },
+    { name: '에이프린트', purpose: '발주', username: 'biz@goodsmoment.com', password: '17691769yys*', manager: '' },
+    { name: '비즈하우스', purpose: '발주', username: 'goodsmoment@naver.com', password: '17691769yys*', manager: '' },
+    { name: '이케아', purpose: '구매', username: 'biz@goodsmoment.com', password: 'Goods151!', manager: '' }
+  ];
+  localStorage.setItem('gm_accounts', JSON.stringify(defaults));
+  return defaults;
+}
+
+function getContactStore() {
+  try {
+    const data = JSON.parse(localStorage.getItem('gm_contacts') || 'null');
+    if (data !== null) return data;
+  } catch (e) {}
+
+  const defaults = [
+    { name: '육연식', nameEn: 'YUK YOEN SIK', position: 'CEO / 대표', team: 'IP사업본부', email: 'yys@goodsmoment.com', phone: '010-4433-8574' },
+    { name: '유희정', nameEn: 'SUNNY RYU', position: 'CCO / 대표', team: 'IP사업본부', email: 'rhj@goodsmoment.com', phone: '010-9120-2393' },
+    { name: '박정미', nameEn: 'PARK JEONG MI', position: 'Director / 본부장', team: 'IP사업본부', email: 'pjm@goodsmoment.com', phone: '010-6271-1005' },
+    { name: '이슬', nameEn: 'LEE SEUL', position: 'PM', team: '매장팀', email: 'is@goodsmoment.com', phone: '010-2869-6377' },
+    { name: '이다비', nameEn: 'LEE DA BEE', position: 'Designer', team: 'IP사업본부', email: 'idb@goodsmoment.com', phone: '010-3932-3263' },
+    { name: '장윤서', nameEn: 'JANG YUN SEO', position: 'Designer', team: 'IP사업본부', email: 'jys@goodsmoment.com', phone: '010-4612-5754' },
+    { name: '김형희', nameEn: '', position: '', team: '매장팀', email: '', phone: '010-2972-5350' },
+    { name: '문지민', nameEn: '', position: '', team: '매장팀', email: '', phone: '010-8815-0847' },
+    { name: '윤진별', nameEn: '', position: '', team: '매장팀', email: '', phone: '010-8351-4397' }
+  ];
+  localStorage.setItem('gm_contacts', JSON.stringify(defaults));
+  return defaults;
+}
+
+function getParttimeStore() {
+  try {
+    const data = JSON.parse(localStorage.getItem('gm_parttime_contacts') || 'null');
+    if (data !== null) return data;
+  } catch (e) {}
+
+  const defaults = [
+    { name: '장주빈', phone: '010-7541-9840', note: '1차' },
+    { name: '김아현', phone: '010-5056-6711', note: '1차' },
+    { name: '양현지', phone: '010-5012-1656', note: '1차' },
+    { name: '박성환', phone: '010-9980-3648', note: '1차' },
+    { name: '전여림', phone: '010-8285-3295', note: '1차' },
+    { name: '차진아', phone: '010-3110-6208', note: '1차' },
+    { name: '이지한', phone: '010-2622-7836', note: '1차' },
+    { name: '이재경', phone: '010-7666-7502', note: '1차' }
+  ];
+  localStorage.setItem('gm_parttime_contacts', JSON.stringify(defaults));
+  return defaults;
+}
+
+// ---- Accounts Tab Switching ----
+function switchAccountsTab(tabName, btnEl) {
+  const tabs = ['shared-accounts', 'emergency-contacts', 'parttime-contacts'];
+  tabs.forEach(t => {
+    const el = document.getElementById('accounts-tab-' + t);
+    if (el) el.style.display = 'none';
+  });
+  document.querySelectorAll('.accounts-tab-btn').forEach(el => {
+    el.style.background = 'transparent';
+    el.style.color = 'var(--gray-600)';
+  });
+  const activeTab = document.getElementById('accounts-tab-' + tabName);
+  if (activeTab) activeTab.style.display = 'block';
+  if (btnEl) {
+    btnEl.style.background = 'var(--primary)';
+    btnEl.style.color = 'white';
+  }
+}
+
+// ---- Accounts CRUD ----
+function loadAccounts() {
+  const accounts = getAccountStore();
+  const tbody = document.getElementById('accounts-list');
+  if (!tbody) return;
+
+  if (accounts.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">등록된 계정이 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = accounts.map((acc, idx) => {
+    const maskedPw = acc.password ? '\u2022'.repeat(Math.min(acc.password.length, 10)) : '-';
+    return `<tr>
+      <td><strong>${acc.name}</strong></td>
+      <td style="font-size:13px; color:var(--gray-500);">${acc.purpose || '-'}</td>
+      <td style="font-size:13px;">${acc.username || '-'}</td>
+      <td style="font-size:13px;">
+        <span id="pw-display-${idx}">${maskedPw}</span>
+        <span id="pw-real-${idx}" style="display:none;">${acc.password || '-'}</span>
+        ${acc.password ? `<button onclick="togglePassword(${idx})" style="background:none; border:none; cursor:pointer; padding:2px 6px; font-size:14px; color:var(--gray-400);" title="비밀번호 보기/숨기기" id="pw-toggle-${idx}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>` : ''}
+      </td>
+      <td style="font-size:13px; color:var(--gray-500);">${acc.manager || '-'}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="openAccountModal(${idx})" style="font-size:12px;">수정</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteAccount(${idx})" style="color:var(--red); font-size:12px;">삭제</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function togglePassword(idx) {
+  const display = document.getElementById('pw-display-' + idx);
+  const real = document.getElementById('pw-real-' + idx);
+  if (!display || !real) return;
+
+  if (real.style.display === 'none') {
+    display.style.display = 'none';
+    real.style.display = 'inline';
+  } else {
+    display.style.display = 'inline';
+    real.style.display = 'none';
+  }
+}
+
+function openAccountModal(editIdx) {
+  const titleEl = document.getElementById('account-modal-title');
+  document.getElementById('account-edit-index').value = '';
+  document.getElementById('account-name').value = '';
+  document.getElementById('account-purpose').value = '';
+  document.getElementById('account-username').value = '';
+  document.getElementById('account-password').value = '';
+  document.getElementById('account-manager').value = '';
+
+  if (editIdx !== undefined && editIdx !== null) {
+    titleEl.textContent = '계정 수정';
+    document.getElementById('account-edit-index').value = editIdx;
+    const accounts = getAccountStore();
+    const acc = accounts[editIdx];
+    if (acc) {
+      document.getElementById('account-name').value = acc.name || '';
+      document.getElementById('account-purpose').value = acc.purpose || '';
+      document.getElementById('account-username').value = acc.username || '';
+      document.getElementById('account-password').value = acc.password || '';
+      document.getElementById('account-manager').value = acc.manager || '';
+    }
+  } else {
+    titleEl.textContent = '계정 추가';
+  }
+  openModal('account-modal');
+}
+
+function saveAccount() {
+  const editIdx = document.getElementById('account-edit-index').value;
+  const name = document.getElementById('account-name').value.trim();
+  const purpose = document.getElementById('account-purpose').value.trim();
+  const username = document.getElementById('account-username').value.trim();
+  const password = document.getElementById('account-password').value.trim();
+  const manager = document.getElementById('account-manager').value.trim();
+
+  if (!name) { showToast('계정명을 입력해주세요.', 'error'); return; }
+
+  const accounts = getAccountStore();
+
+  if (editIdx !== '') {
+    accounts[parseInt(editIdx)] = { name, purpose, username, password, manager };
+    showToast('계정이 수정되었습니다.', 'success');
+  } else {
+    accounts.push({ name, purpose, username, password, manager });
+    showToast('계정이 추가되었습니다.', 'success');
+  }
+
+  localStorage.setItem('gm_accounts', JSON.stringify(accounts));
+  closeModal('account-modal');
+  loadAccounts();
+}
+
+function deleteAccount(idx) {
+  if (!confirm('이 계정을 삭제하시겠습니까?')) return;
+  const accounts = getAccountStore();
+  accounts.splice(idx, 1);
+  localStorage.setItem('gm_accounts', JSON.stringify(accounts));
+  showToast('계정이 삭제되었습니다.', 'success');
+  loadAccounts();
+}
+
+// ---- Contacts CRUD ----
+function loadContacts() {
+  const contacts = getContactStore();
+  const tbody = document.getElementById('contacts-list');
+  if (!tbody) return;
+
+  if (contacts.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">등록된 연락처가 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = contacts.map((c, idx) => {
+    return `<tr>
+      <td><strong>${c.name}</strong></td>
+      <td style="font-size:13px;">${c.nameEn || '-'}</td>
+      <td style="font-size:13px;">${c.position || '-'}</td>
+      <td style="font-size:13px;">${c.team || '-'}</td>
+      <td style="font-size:13px; color:var(--gray-500);">${c.email || '-'}</td>
+      <td style="font-size:13px;">${c.phone || '-'}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="openContactModal(${idx})" style="font-size:12px;">수정</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteContact(${idx})" style="color:var(--red); font-size:12px;">삭제</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openContactModal(editIdx) {
+  const titleEl = document.getElementById('contact-modal-title');
+  document.getElementById('contact-edit-index').value = '';
+  document.getElementById('contact-name').value = '';
+  document.getElementById('contact-name-en').value = '';
+  document.getElementById('contact-position').value = '';
+  document.getElementById('contact-team').value = '';
+  document.getElementById('contact-email').value = '';
+  document.getElementById('contact-phone').value = '';
+
+  if (editIdx !== undefined && editIdx !== null) {
+    titleEl.textContent = '연락처 수정';
+    document.getElementById('contact-edit-index').value = editIdx;
+    const contacts = getContactStore();
+    const c = contacts[editIdx];
+    if (c) {
+      document.getElementById('contact-name').value = c.name || '';
+      document.getElementById('contact-name-en').value = c.nameEn || '';
+      document.getElementById('contact-position').value = c.position || '';
+      document.getElementById('contact-team').value = c.team || '';
+      document.getElementById('contact-email').value = c.email || '';
+      document.getElementById('contact-phone').value = c.phone || '';
+    }
+  } else {
+    titleEl.textContent = '연락처 추가';
+  }
+  openModal('contact-modal');
+}
+
+function saveContact() {
+  const editIdx = document.getElementById('contact-edit-index').value;
+  const name = document.getElementById('contact-name').value.trim();
+  const nameEn = document.getElementById('contact-name-en').value.trim();
+  const position = document.getElementById('contact-position').value.trim();
+  const team = document.getElementById('contact-team').value.trim();
+  const email = document.getElementById('contact-email').value.trim();
+  const phone = document.getElementById('contact-phone').value.trim();
+
+  if (!name) { showToast('이름을 입력해주세요.', 'error'); return; }
+
+  const contacts = getContactStore();
+
+  if (editIdx !== '') {
+    contacts[parseInt(editIdx)] = { name, nameEn, position, team, email, phone };
+    showToast('연락처가 수정되었습니다.', 'success');
+  } else {
+    contacts.push({ name, nameEn, position, team, email, phone });
+    showToast('연락처가 추가되었습니다.', 'success');
+  }
+
+  localStorage.setItem('gm_contacts', JSON.stringify(contacts));
+  closeModal('contact-modal');
+  loadContacts();
+}
+
+function deleteContact(idx) {
+  if (!confirm('이 연락처를 삭제하시겠습니까?')) return;
+  const contacts = getContactStore();
+  contacts.splice(idx, 1);
+  localStorage.setItem('gm_contacts', JSON.stringify(contacts));
+  showToast('연락처가 삭제되었습니다.', 'success');
+  loadContacts();
+}
+
+// ---- Parttime Contacts CRUD ----
+function loadParttimeContacts() {
+  const contacts = getParttimeStore();
+  const tbody = document.getElementById('parttime-contacts-list');
+  if (!tbody) return;
+
+  if (contacts.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">등록된 연락처가 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = contacts.map((c, idx) => {
+    return `<tr>
+      <td><strong>${c.name}</strong></td>
+      <td style="font-size:13px;">${c.phone || '-'}</td>
+      <td style="font-size:13px; color:var(--gray-500);">${c.note || '-'}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="openParttimeModal(${idx})" style="font-size:12px;">수정</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteParttimeContact(${idx})" style="color:var(--red); font-size:12px;">삭제</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openParttimeModal(editIdx) {
+  const titleEl = document.getElementById('parttime-modal-title');
+  document.getElementById('parttime-edit-index').value = '';
+  document.getElementById('parttime-name').value = '';
+  document.getElementById('parttime-phone').value = '';
+  document.getElementById('parttime-note').value = '';
+
+  if (editIdx !== undefined && editIdx !== null) {
+    titleEl.textContent = '파트타임 연락처 수정';
+    document.getElementById('parttime-edit-index').value = editIdx;
+    const contacts = getParttimeStore();
+    const c = contacts[editIdx];
+    if (c) {
+      document.getElementById('parttime-name').value = c.name || '';
+      document.getElementById('parttime-phone').value = c.phone || '';
+      document.getElementById('parttime-note').value = c.note || '';
+    }
+  } else {
+    titleEl.textContent = '파트타임 연락처 추가';
+  }
+  openModal('parttime-modal');
+}
+
+function saveParttimeContact() {
+  const editIdx = document.getElementById('parttime-edit-index').value;
+  const name = document.getElementById('parttime-name').value.trim();
+  const phone = document.getElementById('parttime-phone').value.trim();
+  const note = document.getElementById('parttime-note').value.trim();
+
+  if (!name) { showToast('이름을 입력해주세요.', 'error'); return; }
+
+  const contacts = getParttimeStore();
+
+  if (editIdx !== '') {
+    contacts[parseInt(editIdx)] = { name, phone, note };
+    showToast('연락처가 수정되었습니다.', 'success');
+  } else {
+    contacts.push({ name, phone, note });
+    showToast('연락처가 추가되었습니다.', 'success');
+  }
+
+  localStorage.setItem('gm_parttime_contacts', JSON.stringify(contacts));
+  closeModal('parttime-modal');
+  loadParttimeContacts();
+}
+
+function deleteParttimeContact(idx) {
+  if (!confirm('이 연락처를 삭제하시겠습니까?')) return;
+  const contacts = getParttimeStore();
+  contacts.splice(idx, 1);
+  localStorage.setItem('gm_parttime_contacts', JSON.stringify(contacts));
+  showToast('연락처가 삭제되었습니다.', 'success');
+  loadParttimeContacts();
 }
