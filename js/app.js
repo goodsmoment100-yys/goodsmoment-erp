@@ -807,6 +807,9 @@ async function loadHRList() {
 
   // Load leave summary
   loadHRLeave(members, hrStore, workHoursMap);
+
+  // Load payslips
+  loadPayslips();
 }
 
 // Load leave (연차) summary
@@ -1703,6 +1706,7 @@ function loadProjects() {
             <button class="btn btn-ghost btn-sm proj-tab-btn" onclick="switchProjectTab('${proj.id}', 'overview')" style="font-weight:600; background:var(--primary); color:white;" data-proj-tab="${proj.id}-overview">개요</button>
             <button class="btn btn-ghost btn-sm proj-tab-btn" onclick="switchProjectTab('${proj.id}', 'workers')" data-proj-tab="${proj.id}-workers">인력</button>
             <button class="btn btn-ghost btn-sm proj-tab-btn" onclick="switchProjectTab('${proj.id}', 'revenue')" data-proj-tab="${proj.id}-revenue">매출</button>
+            <button class="btn btn-ghost btn-sm proj-tab-btn" onclick="switchProjectTab('${proj.id}', 'costs')" data-proj-tab="${proj.id}-costs">비용</button>
             <button class="btn btn-ghost btn-sm proj-tab-btn" onclick="switchProjectTab('${proj.id}', 'memo')" data-proj-tab="${proj.id}-memo">메모</button>
           </div>
 
@@ -1802,6 +1806,35 @@ function loadProjects() {
             </div>
           </div>
 
+          <!-- Tab: Costs -->
+          <div id="proj-tab-${proj.id}-costs" style="display:none;">
+            <div>
+              <table>
+                <thead><tr><th>항목</th><th>내용</th><th>금액</th><th>삭제</th></tr></thead>
+                <tbody id="project-costs-${proj.id}">
+                </tbody>
+                <tfoot>
+                  <tr style="font-weight:700;">
+                    <td colspan="2">비용 합계</td>
+                    <td id="project-cost-total-${proj.id}">₩0</td>
+                    <td></td>
+                  </tr>
+                  <tr style="font-weight:700; color:var(--primary);">
+                    <td colspan="2">순익 (매출 - 비용 - 인건비)</td>
+                    <td id="project-profit-${proj.id}">₩0</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+              <div style="margin-top:12px; display:flex; gap:8px;">
+                <input type="text" id="cost-item-${proj.id}" placeholder="항목 (예: 굿즈 제작비)" style="flex:1; padding:8px; border:1px solid var(--gray-200); border-radius:6px;">
+                <input type="text" id="cost-desc-${proj.id}" placeholder="내용" style="flex:1; padding:8px; border:1px solid var(--gray-200); border-radius:6px;">
+                <input type="number" id="cost-amount-${proj.id}" placeholder="금액" style="width:120px; padding:8px; border:1px solid var(--gray-200); border-radius:6px;">
+                <button class="btn btn-primary btn-sm" onclick="addProjectCost('${proj.id}')">추가</button>
+              </div>
+            </div>
+          </div>
+
           <!-- Tab: Memo -->
           <div id="proj-tab-${proj.id}-memo" style="display:none;">
             <div style="background:var(--gray-50); padding:16px; border-radius:8px; min-height:100px; white-space:pre-wrap; line-height:1.8; font-size:14px;">
@@ -1816,7 +1849,7 @@ function loadProjects() {
 
 function switchProjectTab(projId, tabName) {
   // Hide all tabs for this project
-  const tabs = ['overview', 'workers', 'revenue', 'memo'];
+  const tabs = ['overview', 'workers', 'revenue', 'costs', 'memo'];
   tabs.forEach(t => {
     const tabEl = document.getElementById(`proj-tab-${projId}-${t}`);
     if (tabEl) tabEl.style.display = 'none';
@@ -1828,6 +1861,10 @@ function switchProjectTab(projId, tabName) {
   if (activeTab) activeTab.style.display = 'block';
   const activeBtn = document.querySelector(`[data-proj-tab="${projId}-${tabName}"]`);
   if (activeBtn) { activeBtn.style.background = 'var(--primary)'; activeBtn.style.color = 'white'; }
+  // Render costs when switching to costs tab
+  if (tabName === 'costs') {
+    renderProjectCosts(projId);
+  }
 }
 
 function toggleProjectDetail(id) {
@@ -3558,5 +3595,245 @@ function checkLowStock() {
   });
   if (lowItems.length > 0) {
     // Silent check - could show a notification badge if desired
+  }
+}
+
+// ============================================
+// Payslip (급여명세서)
+// ============================================
+
+// 4대보험 공제 계산 (간이)
+function calculateDeductions(grossPay, type) {
+  if (type === 'parttime' || grossPay < 500000) {
+    // 알바/PT는 3.3% 원천징수
+    return Math.round(grossPay * 0.033);
+  }
+  // 정규직 4대보험 근사치
+  // 국민연금 4.5% + 건강보험 3.545% + 장기요양 0.4541% + 고용보험 0.9% = ~9.4%
+  return Math.round(grossPay * 0.094);
+}
+
+function loadPayslips() {
+  // Fill month selector (recent 6 months)
+  const select = document.getElementById('payslip-month');
+  if (!select) return;
+  select.innerHTML = '';
+  const now = new Date();
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i);
+    const val = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    const label = d.getFullYear() + '년 ' + (d.getMonth()+1) + '월';
+    select.innerHTML += `<option value="${val}">${label}</option>`;
+  }
+  select.onchange = renderPayslips;
+  renderPayslips();
+}
+
+function renderPayslips() {
+  const hrData = JSON.parse(localStorage.getItem('gm_hr_data') || '{}');
+  const tbody = document.getElementById('payslip-table');
+  if (!tbody) return;
+
+  // Get all profiles (from what we can access)
+  // Use HR data merged with known staff
+  const staffList = Object.entries(hrData).map(([id, data]) => ({
+    id, ...data
+  }));
+
+  // If no HR data, show message
+  if (staffList.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">인사관리에서 직원 정보를 먼저 등록하세요.</td></tr>';
+    return;
+  }
+
+  let totalGross = 0, totalDeduct = 0, totalNet = 0;
+
+  tbody.innerHTML = staffList.map(staff => {
+    const payType = staff.payType || 'monthly';
+    const payAmount = parseInt(staff.payAmount) || 0;
+    const contractType = staff.contractType || 'regular';
+
+    let grossPay = payAmount;
+    if (payType === 'hourly') {
+      // Estimate monthly: hourly x 209 hours (standard)
+      grossPay = payAmount * 209;
+    }
+
+    const deductions = calculateDeductions(grossPay, contractType);
+    const netPay = grossPay - deductions;
+
+    totalGross += grossPay;
+    totalDeduct += deductions;
+    totalNet += netPay;
+
+    return `<tr>
+      <td style="font-weight:600;">${staff.name || '-'}</td>
+      <td>${staff.department || '-'}</td>
+      <td><span class="badge ${contractType === 'parttime' ? 'badge-pending' : 'badge-approved'}">${contractType === 'regular' ? '정규직' : contractType === 'contract' ? '계약직' : '알바'}</span></td>
+      <td>₩${grossPay.toLocaleString()}</td>
+      <td style="color:var(--red);">-₩${deductions.toLocaleString()}</td>
+      <td style="font-weight:700;">₩${netPay.toLocaleString()}</td>
+      <td><button class="btn btn-sm btn-secondary" onclick="downloadPayslip('${staff.id}')">다운로드</button></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('payslip-total-gross').textContent = '₩' + totalGross.toLocaleString();
+  document.getElementById('payslip-total-deduct').textContent = '-₩' + totalDeduct.toLocaleString();
+  document.getElementById('payslip-total-net').textContent = '₩' + totalNet.toLocaleString();
+}
+
+function downloadPayslip(staffId) {
+  const hrData = JSON.parse(localStorage.getItem('gm_hr_data') || '{}');
+  const staff = hrData[staffId];
+  if (!staff) return;
+
+  const month = document.getElementById('payslip-month')?.value || '';
+  const monthLabel = month.replace('-', '년 ') + '월';
+
+  const payAmount = parseInt(staff.payAmount) || 0;
+  const payType = staff.payType || 'monthly';
+  const contractType = staff.contractType || 'regular';
+  let grossPay = payType === 'hourly' ? payAmount * 209 : payAmount;
+  const deductions = calculateDeductions(grossPay, contractType);
+  const netPay = grossPay - deductions;
+
+  // Insurance breakdown (approximate)
+  const pension = Math.round(grossPay * 0.045);
+  const health = Math.round(grossPay * 0.03545);
+  const longcare = Math.round(grossPay * 0.004541);
+  const employ = Math.round(grossPay * 0.009);
+
+  const wb = XLSX.utils.book_new();
+  const data = [
+    ['급 여 명 세 서'],
+    [],
+    ['회사명', '', '주식회사 굿즈모먼트'],
+    ['정산월', '', monthLabel],
+    [],
+    ['성명', '', staff.name || '-'],
+    ['부서', '', staff.department || '-'],
+    ['직급', '', staff.position || '-'],
+    ['계약형태', '', contractType === 'regular' ? '정규직' : contractType === 'contract' ? '계약직' : '알바'],
+    [],
+    ['[지급내역]'],
+    ['기본급', '', grossPay],
+    [],
+    ['[공제내역]'],
+  ];
+
+  if (contractType === 'parttime') {
+    data.push(['원천징수 (3.3%)', '', deductions]);
+  } else {
+    data.push(['국민연금 (4.5%)', '', pension]);
+    data.push(['건강보험 (3.545%)', '', health]);
+    data.push(['장기요양 (0.454%)', '', longcare]);
+    data.push(['고용보험 (0.9%)', '', employ]);
+    data.push(['공제 합계', '', deductions]);
+  }
+
+  data.push([]);
+  data.push(['세전 급여', '', grossPay]);
+  data.push(['공제 합계', '', deductions]);
+  data.push(['세후 지급액', '', netPay]);
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{wch:18},{wch:4},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws, '급여명세서');
+
+  XLSX.writeFile(wb, `${staff.name}_${monthLabel}_급여명세서.xlsx`);
+  showToast(`${staff.name} 급여명세서 다운로드 완료`, 'success');
+}
+
+function generateAllPayslips() {
+  const hrData = JSON.parse(localStorage.getItem('gm_hr_data') || '{}');
+  Object.keys(hrData).forEach((id, i) => {
+    setTimeout(() => downloadPayslip(id), i * 300);
+  });
+}
+
+// ============================================
+// Project Cost Tracking (비용 관리)
+// ============================================
+
+function addProjectCost(projectId) {
+  const itemEl = document.getElementById('cost-item-' + projectId);
+  const descEl = document.getElementById('cost-desc-' + projectId);
+  const amountEl = document.getElementById('cost-amount-' + projectId);
+  if (!itemEl || !amountEl) return;
+
+  const item = itemEl.value.trim();
+  const desc = descEl ? descEl.value.trim() : '';
+  const amount = parseInt(amountEl.value) || 0;
+
+  if (!item || !amount) {
+    showToast('항목과 금액을 입력하세요.', 'error');
+    return;
+  }
+
+  const projects = getProjectStore();
+  const proj = projects.find(p => p.id === projectId);
+  if (!proj) return;
+
+  if (!proj.costs) proj.costs = [];
+  proj.costs.push({ item, desc, amount });
+  setProjectStore(projects);
+
+  itemEl.value = '';
+  if (descEl) descEl.value = '';
+  amountEl.value = '';
+
+  renderProjectCosts(projectId);
+  showToast('비용이 추가되었습니다.', 'success');
+}
+
+function deleteProjectCost(projectId, index) {
+  if (!confirm('이 비용 항목을 삭제하시겠습니까?')) return;
+  const projects = getProjectStore();
+  const proj = projects.find(p => p.id === projectId);
+  if (!proj || !proj.costs) return;
+
+  proj.costs.splice(index, 1);
+  setProjectStore(projects);
+  renderProjectCosts(projectId);
+  showToast('비용이 삭제되었습니다.', 'success');
+}
+
+function renderProjectCosts(projectId) {
+  const projects = getProjectStore();
+  const proj = projects.find(p => p.id === projectId);
+  if (!proj) return;
+
+  const costs = proj.costs || [];
+  const tbody = document.getElementById('project-costs-' + projectId);
+  if (!tbody) return;
+
+  let totalCost = 0;
+
+  if (costs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">등록된 비용이 없습니다.</td></tr>';
+  } else {
+    tbody.innerHTML = costs.map((c, i) => {
+      totalCost += (c.amount || 0);
+      return `<tr>
+        <td style="font-weight:600;">${c.item}</td>
+        <td>${c.desc || '-'}</td>
+        <td>₩${(c.amount || 0).toLocaleString()}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="deleteProjectCost('${projectId}', ${i})" style="color:var(--red); font-size:12px;">삭제</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Recalculate totalCost from scratch for footer
+  totalCost = costs.reduce((sum, c) => sum + (c.amount || 0), 0);
+  const laborCost = calculateProjectCost(proj);
+  const revenue = proj.actualRevenue || 0;
+  const profit = revenue - totalCost - laborCost;
+
+  const totalEl = document.getElementById('project-cost-total-' + projectId);
+  const profitEl = document.getElementById('project-profit-' + projectId);
+  if (totalEl) totalEl.textContent = '₩' + totalCost.toLocaleString();
+  if (profitEl) {
+    profitEl.textContent = '₩' + profit.toLocaleString();
+    profitEl.style.color = profit >= 0 ? 'var(--primary)' : 'var(--red)';
   }
 }
