@@ -518,6 +518,7 @@ function navigateTo(page) {
     case 'schedule': loadSchedule(); break;
     case 'admin': loadMembers(); break;
     case 'hr': loadHRList(); break;
+    case 'project': loadProjects(); break;
   }
 }
 
@@ -1268,4 +1269,413 @@ async function saveHRData() {
 
   closeModal('hr-modal');
   loadHRList();
+}
+
+// ============================================
+// Project Management (프로젝트 관리)
+// ============================================
+
+function getProjectStore() {
+  try {
+    return JSON.parse(localStorage.getItem('gm_projects') || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function setProjectStore(data) {
+  localStorage.setItem('gm_projects', JSON.stringify(data));
+}
+
+function loadProjects() {
+  const projects = getProjectStore();
+
+  // Update stats
+  const now = new Date();
+  const thisMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
+  const activeCount = projects.filter(p => p.status === 'active').length;
+  const completedCount = projects.filter(p => p.status === 'completed').length;
+  const totalWorkers = projects.filter(p => p.status === 'active').reduce((sum, p) => sum + (p.workers ? p.workers.length : 0), 0);
+
+  // This month revenue: projects whose period overlaps this month
+  const monthStart = thisMonth + '-01';
+  const monthEnd = thisMonth + '-31';
+  const monthRevenue = projects.reduce((sum, p) => {
+    if (p.startDate <= monthEnd && p.endDate >= monthStart) {
+      return sum + (p.actualRevenue || 0);
+    }
+    return sum;
+  }, 0);
+
+  const el = (id) => document.getElementById(id);
+  if (el('proj-stat-active')) el('proj-stat-active').textContent = activeCount;
+  if (el('proj-stat-revenue')) el('proj-stat-revenue').textContent = monthRevenue.toLocaleString() + '원';
+  if (el('proj-stat-workers')) el('proj-stat-workers').textContent = totalWorkers + '명';
+  if (el('proj-stat-completed')) el('proj-stat-completed').textContent = completedCount;
+
+  // Render project cards
+  const listEl = document.getElementById('project-list');
+  if (!listEl) return;
+
+  if (projects.length === 0) {
+    listEl.innerHTML = '<div class="empty-state"><p>등록된 프로젝트가 없습니다.</p></div>';
+    return;
+  }
+
+  const statusMap = { preparing: '준비중', active: '진행중', completed: '완료' };
+  const statusColorMap = { preparing: '#f59e0b', active: '#10b981', completed: '#9ca3af' };
+  const statusBgMap = { preparing: 'rgba(245,158,11,0.1)', active: 'rgba(16,185,129,0.1)', completed: 'rgba(156,163,175,0.1)' };
+
+  listEl.innerHTML = projects.map((proj, idx) => {
+    const statusText = statusMap[proj.status] || proj.status;
+    const statusColor = statusColorMap[proj.status] || '#9ca3af';
+    const statusBg = statusBgMap[proj.status] || 'rgba(156,163,175,0.1)';
+    const workerCount = proj.workers ? proj.workers.length : 0;
+    const laborCost = calculateProjectCost(proj);
+
+    return `<div class="card" style="margin-bottom:16px;">
+      <div class="card-body" style="cursor:pointer;" onclick="toggleProjectDetail('${proj.id}')">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+          <div style="flex:1; min-width:200px;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+              <h3 style="margin:0; font-size:16px; font-weight:700;">${proj.name}</h3>
+              <span style="display:inline-block; padding:2px 10px; border-radius:20px; font-size:11px; font-weight:700; background:${statusBg}; color:${statusColor};">${statusText}</span>
+            </div>
+            <div style="display:flex; gap:16px; flex-wrap:wrap; font-size:13px; color:var(--gray-500);">
+              <span>IP: ${proj.ip || '-'}</span>
+              <span>${proj.floor || '-'}</span>
+              <span>${proj.startDate || '-'} ~ ${proj.endDate || '-'}</span>
+              <span>알바 ${workerCount}명</span>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px; color:var(--gray-400); margin-bottom:4px;">예상 / 실제 매출</div>
+            <div style="font-size:18px; font-weight:800; color:var(--black);">
+              ${(proj.expectedRevenue || 0).toLocaleString()}원
+            </div>
+            <div style="font-size:15px; font-weight:700; color:var(--primary);">
+              ${(proj.actualRevenue || 0).toLocaleString()}원
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detail View (hidden by default) -->
+      <div id="project-detail-${proj.id}" style="display:none; border-top:1px solid var(--gray-100);">
+        <div style="padding:16px 20px;">
+          <!-- Tabs -->
+          <div style="display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid var(--gray-100); padding-bottom:8px;">
+            <button class="btn btn-ghost btn-sm proj-tab-btn" onclick="switchProjectTab('${proj.id}', 'overview')" style="font-weight:600; background:var(--primary); color:white;" data-proj-tab="${proj.id}-overview">개요</button>
+            <button class="btn btn-ghost btn-sm proj-tab-btn" onclick="switchProjectTab('${proj.id}', 'workers')" data-proj-tab="${proj.id}-workers">인력</button>
+            <button class="btn btn-ghost btn-sm proj-tab-btn" onclick="switchProjectTab('${proj.id}', 'revenue')" data-proj-tab="${proj.id}-revenue">매출</button>
+            <button class="btn btn-ghost btn-sm proj-tab-btn" onclick="switchProjectTab('${proj.id}', 'memo')" data-proj-tab="${proj.id}-memo">메모</button>
+          </div>
+
+          <!-- Tab: Overview -->
+          <div id="proj-tab-${proj.id}-overview">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:14px;">
+              <div style="background:var(--gray-50); padding:12px 16px; border-radius:8px;">
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600;">프로젝트명</div>
+                <div style="font-weight:700; margin-top:4px;">${proj.name}</div>
+              </div>
+              <div style="background:var(--gray-50); padding:12px 16px; border-radius:8px;">
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600;">IP/작품명</div>
+                <div style="font-weight:700; margin-top:4px;">${proj.ip || '-'}</div>
+              </div>
+              <div style="background:var(--gray-50); padding:12px 16px; border-radius:8px;">
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600;">기간</div>
+                <div style="font-weight:700; margin-top:4px;">${proj.startDate || '-'} ~ ${proj.endDate || '-'}</div>
+              </div>
+              <div style="background:var(--gray-50); padding:12px 16px; border-radius:8px;">
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600;">층</div>
+                <div style="font-weight:700; margin-top:4px;">${proj.floor || '-'}</div>
+              </div>
+              <div style="background:var(--gray-50); padding:12px 16px; border-radius:8px;">
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600;">투입 인력</div>
+                <div style="font-weight:700; margin-top:4px;">${workerCount}명</div>
+              </div>
+              <div style="background:var(--gray-50); padding:12px 16px; border-radius:8px;">
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600;">예상 인건비</div>
+                <div style="font-weight:700; margin-top:4px;">${laborCost.toLocaleString()}원</div>
+              </div>
+            </div>
+            <div style="margin-top:16px; display:flex; gap:8px;">
+              <button class="btn btn-ghost btn-sm" onclick="openProjectModal('${proj.id}')" style="color:var(--primary);">수정</button>
+              <button class="btn btn-ghost btn-sm" onclick="deleteProject('${proj.id}')" style="color:var(--red);">삭제</button>
+            </div>
+          </div>
+
+          <!-- Tab: Workers -->
+          <div id="proj-tab-${proj.id}-workers" style="display:none;">
+            <div style="margin-bottom:12px;">
+              <button class="btn btn-primary btn-sm" onclick="openWorkerModal('${proj.id}')">+ 알바 배정</button>
+            </div>
+            ${workerCount === 0 ? '<div class="empty-state"><p>배정된 알바가 없습니다.</p></div>' : `
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>이름</th>
+                    <th>연락처</th>
+                    <th>시급</th>
+                    <th>근무기간</th>
+                    <th>근무일수</th>
+                    <th>예상 급여</th>
+                    <th>메모</th>
+                    <th>삭제</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${proj.workers.map((w, wi) => {
+                    const days = w.startDate && w.endDate ? Math.max(1, Math.ceil((new Date(w.endDate) - new Date(w.startDate)) / 86400000) + 1) : 0;
+                    const estPay = days * 8 * (w.hourlyRate || 0);
+                    return `<tr>
+                      <td><strong>${w.name}</strong></td>
+                      <td style="font-size:13px;">${w.phone || '-'}</td>
+                      <td>${(w.hourlyRate || 0).toLocaleString()}원</td>
+                      <td style="font-size:12px;">${w.startDate || '-'} ~ ${w.endDate || '-'}</td>
+                      <td>${days}일</td>
+                      <td style="font-weight:700;">${estPay.toLocaleString()}원</td>
+                      <td style="font-size:12px; color:var(--gray-500);">${w.memo || '-'}</td>
+                      <td><button class="btn btn-ghost btn-sm" onclick="deleteProjectWorker('${proj.id}', ${wi})" style="color:var(--red); font-size:12px;">삭제</button></td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>`}
+          </div>
+
+          <!-- Tab: Revenue -->
+          <div id="proj-tab-${proj.id}-revenue" style="display:none;">
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+              <div style="background:var(--gray-50); padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600;">예상 매출</div>
+                <div style="font-size:22px; font-weight:800; margin-top:8px;">${(proj.expectedRevenue || 0).toLocaleString()}원</div>
+              </div>
+              <div style="background:rgba(13,148,136,0.06); padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600;">실제 매출</div>
+                <div style="font-size:22px; font-weight:800; margin-top:8px; color:var(--primary);">${(proj.actualRevenue || 0).toLocaleString()}원</div>
+              </div>
+              <div style="background:rgba(239,68,68,0.06); padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600;">예상 인건비</div>
+                <div style="font-size:22px; font-weight:800; margin-top:8px; color:var(--red);">${laborCost.toLocaleString()}원</div>
+              </div>
+            </div>
+            <div style="margin-top:16px; background:var(--gray-50); padding:16px; border-radius:8px; text-align:center;">
+              <div style="font-size:11px; color:var(--gray-500); font-weight:600;">예상 순이익 (실제매출 - 인건비)</div>
+              <div style="font-size:26px; font-weight:800; margin-top:8px; color:${((proj.actualRevenue || 0) - laborCost) >= 0 ? 'var(--primary)' : 'var(--red)'};">${((proj.actualRevenue || 0) - laborCost).toLocaleString()}원</div>
+            </div>
+          </div>
+
+          <!-- Tab: Memo -->
+          <div id="proj-tab-${proj.id}-memo" style="display:none;">
+            <div style="background:var(--gray-50); padding:16px; border-radius:8px; min-height:100px; white-space:pre-wrap; line-height:1.8; font-size:14px;">
+              ${proj.memo || '메모가 없습니다.'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function switchProjectTab(projId, tabName) {
+  // Hide all tabs for this project
+  const tabs = ['overview', 'workers', 'revenue', 'memo'];
+  tabs.forEach(t => {
+    const tabEl = document.getElementById(`proj-tab-${projId}-${t}`);
+    if (tabEl) tabEl.style.display = 'none';
+    const btnEl = document.querySelector(`[data-proj-tab="${projId}-${t}"]`);
+    if (btnEl) { btnEl.style.background = 'transparent'; btnEl.style.color = 'var(--gray-600)'; }
+  });
+  // Show selected tab
+  const activeTab = document.getElementById(`proj-tab-${projId}-${tabName}`);
+  if (activeTab) activeTab.style.display = 'block';
+  const activeBtn = document.querySelector(`[data-proj-tab="${projId}-${tabName}"]`);
+  if (activeBtn) { activeBtn.style.background = 'var(--primary)'; activeBtn.style.color = 'white'; }
+}
+
+function toggleProjectDetail(id) {
+  const detail = document.getElementById('project-detail-' + id);
+  if (!detail) return;
+  detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+}
+
+function openProjectModal(projectId) {
+  const titleEl = document.getElementById('project-modal-title');
+
+  // Reset form
+  document.getElementById('project-edit-id').value = '';
+  document.getElementById('project-name').value = '';
+  document.getElementById('project-ip').value = '';
+  document.getElementById('project-status').value = 'preparing';
+  document.getElementById('project-floor').value = '4층';
+  document.getElementById('project-start-date').value = '';
+  document.getElementById('project-end-date').value = '';
+  document.getElementById('project-expected-revenue').value = '';
+  document.getElementById('project-actual-revenue').value = '';
+  document.getElementById('project-memo').value = '';
+
+  if (projectId) {
+    titleEl.textContent = '프로젝트 수정';
+    document.getElementById('project-edit-id').value = projectId;
+
+    const projects = getProjectStore();
+    const proj = projects.find(p => p.id === projectId);
+    if (proj) {
+      document.getElementById('project-name').value = proj.name || '';
+      document.getElementById('project-ip').value = proj.ip || '';
+      document.getElementById('project-status').value = proj.status || 'preparing';
+      document.getElementById('project-floor').value = proj.floor || '4층';
+      document.getElementById('project-start-date').value = proj.startDate || '';
+      document.getElementById('project-end-date').value = proj.endDate || '';
+      document.getElementById('project-expected-revenue').value = proj.expectedRevenue || '';
+      document.getElementById('project-actual-revenue').value = proj.actualRevenue || '';
+      document.getElementById('project-memo').value = proj.memo || '';
+    }
+  } else {
+    titleEl.textContent = '프로젝트 생성';
+  }
+
+  openModal('project-modal');
+}
+
+function saveProject() {
+  const editId = document.getElementById('project-edit-id').value;
+  const name = document.getElementById('project-name').value.trim();
+  const ip = document.getElementById('project-ip').value.trim();
+  const status = document.getElementById('project-status').value;
+  const floor = document.getElementById('project-floor').value;
+  const startDate = document.getElementById('project-start-date').value;
+  const endDate = document.getElementById('project-end-date').value;
+  const expectedRevenue = parseInt(document.getElementById('project-expected-revenue').value) || 0;
+  const actualRevenue = parseInt(document.getElementById('project-actual-revenue').value) || 0;
+  const memo = document.getElementById('project-memo').value.trim();
+
+  if (!name) { showToast('프로젝트명을 입력해주세요.', 'error'); return; }
+  if (!startDate || !endDate) { showToast('기간을 입력해주세요.', 'error'); return; }
+
+  const projects = getProjectStore();
+
+  if (editId) {
+    // Edit existing
+    const idx = projects.findIndex(p => p.id === editId);
+    if (idx !== -1) {
+      projects[idx].name = name;
+      projects[idx].ip = ip;
+      projects[idx].status = status;
+      projects[idx].floor = floor;
+      projects[idx].startDate = startDate;
+      projects[idx].endDate = endDate;
+      projects[idx].expectedRevenue = expectedRevenue;
+      projects[idx].actualRevenue = actualRevenue;
+      projects[idx].memo = memo;
+    }
+    showToast('프로젝트가 수정되었습니다.', 'success');
+  } else {
+    // Create new
+    projects.push({
+      id: 'proj_' + Date.now(),
+      name: name,
+      ip: ip,
+      status: status,
+      startDate: startDate,
+      endDate: endDate,
+      floor: floor,
+      expectedRevenue: expectedRevenue,
+      actualRevenue: actualRevenue,
+      memo: memo,
+      workers: [],
+      createdAt: new Date().toISOString().split('T')[0]
+    });
+    showToast('프로젝트가 생성되었습니다.', 'success');
+  }
+
+  setProjectStore(projects);
+  closeModal('project-modal');
+  loadProjects();
+}
+
+function deleteProject(id) {
+  if (!confirm('이 프로젝트를 삭제하시겠습니까?')) return;
+  const projects = getProjectStore();
+  const filtered = projects.filter(p => p.id !== id);
+  setProjectStore(filtered);
+  showToast('프로젝트가 삭제되었습니다.', 'success');
+  loadProjects();
+}
+
+function openWorkerModal(projectId) {
+  document.getElementById('project-worker-project-id').value = projectId;
+  document.getElementById('project-worker-name').value = '';
+  document.getElementById('project-worker-phone').value = '';
+  document.getElementById('project-worker-rate').value = '10030';
+  document.getElementById('project-worker-start').value = '';
+  document.getElementById('project-worker-end').value = '';
+  document.getElementById('project-worker-memo').value = '';
+
+  // Pre-fill dates from project
+  const projects = getProjectStore();
+  const proj = projects.find(p => p.id === projectId);
+  if (proj) {
+    document.getElementById('project-worker-start').value = proj.startDate || '';
+    document.getElementById('project-worker-end').value = proj.endDate || '';
+  }
+
+  openModal('project-worker-modal');
+}
+
+function saveProjectWorker() {
+  const projectId = document.getElementById('project-worker-project-id').value;
+  const name = document.getElementById('project-worker-name').value.trim();
+  const phone = document.getElementById('project-worker-phone').value.trim();
+  const hourlyRate = parseInt(document.getElementById('project-worker-rate').value) || 0;
+  const startDate = document.getElementById('project-worker-start').value;
+  const endDate = document.getElementById('project-worker-end').value;
+  const memo = document.getElementById('project-worker-memo').value.trim();
+
+  if (!name) { showToast('이름을 입력해주세요.', 'error'); return; }
+  if (!hourlyRate) { showToast('시급을 입력해주세요.', 'error'); return; }
+
+  const projects = getProjectStore();
+  const proj = projects.find(p => p.id === projectId);
+  if (!proj) { showToast('프로젝트를 찾을 수 없습니다.', 'error'); return; }
+
+  if (!proj.workers) proj.workers = [];
+  proj.workers.push({
+    id: 'w_' + Date.now(),
+    name: name,
+    phone: phone,
+    hourlyRate: hourlyRate,
+    startDate: startDate,
+    endDate: endDate,
+    memo: memo
+  });
+
+  setProjectStore(projects);
+  closeModal('project-worker-modal');
+  showToast(name + ' 알바가 배정되었습니다.', 'success');
+  loadProjects();
+}
+
+function deleteProjectWorker(projectId, workerIndex) {
+  if (!confirm('이 알바를 삭제하시겠습니까?')) return;
+  const projects = getProjectStore();
+  const proj = projects.find(p => p.id === projectId);
+  if (!proj || !proj.workers) return;
+
+  proj.workers.splice(workerIndex, 1);
+  setProjectStore(projects);
+  showToast('알바가 삭제되었습니다.', 'success');
+  loadProjects();
+}
+
+function calculateProjectCost(project) {
+  if (!project.workers || project.workers.length === 0) return 0;
+  return project.workers.reduce((total, w) => {
+    const days = w.startDate && w.endDate ? Math.max(1, Math.ceil((new Date(w.endDate) - new Date(w.startDate)) / 86400000) + 1) : 0;
+    const estPay = days * 8 * (w.hourlyRate || 0); // 8 hours per day assumed
+    return total + estPay;
+  }, 0);
 }

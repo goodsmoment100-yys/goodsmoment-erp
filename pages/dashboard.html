@@ -48,6 +48,10 @@
             <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             스케줄
           </a>
+          <a class="nav-item" data-page="project" onclick="navigateTo('project')">
+            <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+            프로젝트
+          </a>
         </div>
 
         <div class="nav-section">
@@ -725,6 +729,61 @@
         </div>
       </div>
 
+      <!-- ===== PROJECT (프로젝트 관리) ===== -->
+      <div id="section-project" class="page-section" style="display:none;">
+        <div class="page-header">
+          <div>
+            <h1>프로젝트</h1>
+            <div class="header-sub">팝업/이벤트 프로젝트 관리</div>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-primary btn-sm" onclick="openProjectModal()">
+              + 프로젝트 생성
+            </button>
+          </div>
+        </div>
+        <div class="page-body">
+
+          <!-- Stats -->
+          <div class="stats-grid" style="margin-bottom:24px;">
+            <div class="stat-card">
+              <div class="stat-icon green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div class="stat-value" id="proj-stat-active">0</div>
+              <div class="stat-label">진행중 프로젝트</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+              </div>
+              <div class="stat-value" id="proj-stat-revenue">0원</div>
+              <div class="stat-label">이번 달 프로젝트 매출</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon yellow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              </div>
+              <div class="stat-value" id="proj-stat-workers">0명</div>
+              <div class="stat-label">투입 알바 수</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon red">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+              </div>
+              <div class="stat-value" id="proj-stat-completed">0</div>
+              <div class="stat-label">완료 프로젝트</div>
+            </div>
+          </div>
+
+          <!-- Project List -->
+          <div id="project-list">
+            <div class="empty-state"><p>등록된 프로젝트가 없습니다.</p></div>
+          </div>
+
+        </div>
+      </div>
+
     </main>
   </div>
 
@@ -1012,6 +1071,114 @@
       <div class="modal-footer">
         <button class="btn btn-secondary btn-sm" onclick="closeModal('resource-modal')">취소</button>
         <button class="btn btn-primary btn-sm" onclick="saveResource()">등록</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project Modal -->
+  <div class="modal-overlay" id="project-modal">
+    <div class="modal" style="max-width:560px;">
+      <div class="modal-header">
+        <h3 id="project-modal-title">프로젝트 생성</h3>
+        <button class="modal-close" onclick="closeModal('project-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="project-edit-id">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>프로젝트명</label>
+            <input type="text" id="project-name" placeholder="예: 청춘블라썸 팝업 4층">
+          </div>
+          <div class="form-group">
+            <label>IP/작품명</label>
+            <input type="text" id="project-ip" placeholder="예: 청춘블라썸">
+          </div>
+          <div class="form-group">
+            <label>상태</label>
+            <select id="project-status">
+              <option value="preparing">준비중</option>
+              <option value="active">진행중</option>
+              <option value="completed">완료</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>층</label>
+            <select id="project-floor">
+              <option value="1층">1층</option>
+              <option value="2층">2층</option>
+              <option value="3층">3층</option>
+              <option value="4층">4층</option>
+              <option value="전체">전체</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>시작일</label>
+            <input type="date" id="project-start-date">
+          </div>
+          <div class="form-group">
+            <label>종료일</label>
+            <input type="date" id="project-end-date">
+          </div>
+          <div class="form-group">
+            <label>예상 매출 (원)</label>
+            <input type="number" id="project-expected-revenue" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label>실제 매출 (원)</label>
+            <input type="number" id="project-actual-revenue" placeholder="0">
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:4px;">
+          <label>메모</label>
+          <textarea id="project-memo" placeholder="메모 (선택)" style="height:60px;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="closeModal('project-modal')">취소</button>
+        <button class="btn btn-primary btn-sm" onclick="saveProject()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project Worker Modal -->
+  <div class="modal-overlay" id="project-worker-modal">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-header">
+        <h3>알바 배정</h3>
+        <button class="modal-close" onclick="closeModal('project-worker-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="project-worker-project-id">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>이름</label>
+            <input type="text" id="project-worker-name" placeholder="이름">
+          </div>
+          <div class="form-group">
+            <label>연락처</label>
+            <input type="tel" id="project-worker-phone" placeholder="010-0000-0000">
+          </div>
+          <div class="form-group">
+            <label>시급 (원)</label>
+            <input type="number" id="project-worker-rate" placeholder="10030" value="10030">
+          </div>
+          <div class="form-group">
+            <label>근무 시작일</label>
+            <input type="date" id="project-worker-start">
+          </div>
+          <div class="form-group" style="grid-column:span 2;">
+            <label>근무 종료일</label>
+            <input type="date" id="project-worker-end">
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:4px;">
+          <label>메모</label>
+          <textarea id="project-worker-memo" placeholder="메모 (선택)" style="height:60px;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="closeModal('project-worker-modal')">취소</button>
+        <button class="btn btn-primary btn-sm" onclick="saveProjectWorker()">저장</button>
       </div>
     </div>
   </div>
