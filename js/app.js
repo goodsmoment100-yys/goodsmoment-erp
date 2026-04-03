@@ -4,13 +4,13 @@
 
 // ---- Permission Helper ----
 function isManager(user) {
-  // 현재 모든 멤버가 임원이므로 전체 해제
-  // 나중에 팀원 들어오면 아래 주석 해제하고 이 줄 삭제
-  return true;
-  // if (!user || !user.profile) return false;
-  // const role = user.profile.role;
-  // const dept = user.profile.department;
-  // return role === 'ceo' || role === 'admin' || role === 'manager' || dept === '경영';
+  if (!user || !user.profile) return false;
+  const name = user.profile.name || '';
+  const role = user.profile.role || '';
+  // 육연식, 유희정, 박정미만 ADMIN 접근 가능
+  if (name === '육연식' || name === '유희정' || name === '박정미') return true;
+  if (role === 'ceo' || role === 'admin') return true;
+  return false;
 }
 
 // ---- Toast Notifications ----
