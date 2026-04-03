@@ -696,14 +696,15 @@ function navigateTo(page) {
     case 'notice': loadNotices(); break;
     case 'resources': loadResources(); break;
     case 'schedule': loadSchedule(); break;
-    case 'admin': loadMembers(); break;
-    case 'hr': loadHRList(); break;
+    case 'admin': navigateTo('hr'); return; // 조직관리 → 인사/조직관리로 통합
+    case 'hr': loadHRList(); loadMembers(); break;
     case 'project': loadProjects(); break;
     case 'accounts': loadAccounts(); loadContacts(); loadParttimeContacts(); break;
     case 'calendar': loadCalendar(); break;
     case 'messages': loadMessages(); break;
     case 'inventory': loadInventory(); break;
     case 'clients': loadClients(); break;
+    case 'report': loadReport(); break;
   }
 }
 

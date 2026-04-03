@@ -337,6 +337,9 @@ function runSettlement() {
 
   // UI 업데이트
   renderSettlementResults(results, grandTotal);
+
+  // 정산 이력 저장 (경영 리포트용)
+  saveSettlementHistory(settleMonth, results, grandTotal);
 }
 
 // ---- 제작사 설정 찾기 ----
@@ -564,6 +567,26 @@ function calculateUrbanSettlement() {
   if (el('urban-rent')) el('urban-rent').textContent = fmt(rent);
   if (el('urban-mgmt-display')) el('urban-mgmt-display').textContent = fmt(mgmtCost);
   if (el('urban-total-payment')) el('urban-total-payment').textContent = fmt(totalPayment);
+
+  // 어반 정산 이력 저장 (경영 리포트용)
+  const urbanMonth = document.getElementById('urban-settle-month') ? document.getElementById('urban-settle-month').value : '';
+  if (urbanMonth) {
+    saveUrbanHistory(urbanMonth, {
+      revenue: totalRevenue,
+      costs: totalCost,
+      costShare: costShare,
+      netProfit: netProfit,
+      urbanShare: urbanShare,
+      gmShare: gmShare,
+      rent: rent,
+      totalPayment: totalPayment,
+      storeSales: storeSales,
+      gachaSales: gachaSales,
+      laborCost: laborCost,
+      suppliesCost: suppliesCost,
+      mgmtCost: mgmtCost
+    });
+  }
 }
 
 // ---- 인사관리에서 인건비 가져오기 ----
@@ -704,4 +727,254 @@ function downloadUrbanSettlement() {
   const fileName = '어반플레이_' + monthStr + '_정산서.xlsx';
   XLSX.writeFile(wb, fileName);
   showToast(fileName + ' 다운로드 완료', 'success');
+}
+
+// ============================================
+// SETTLEMENT HISTORY & REPORT (경영 리포트)
+// ============================================
+
+// ---- 정산 이력 저장 ----
+function saveSettlementHistory(month, results, grandTotal) {
+  const history = JSON.parse(localStorage.getItem('gm_settlement_history') || '{}');
+  history[month] = {
+    date: new Date().toISOString(),
+    month: month,
+    totalSales: grandTotal.totalSales,
+    netSales: grandTotal.netSales,
+    publisherShare: grandTotal.publisherShare,
+    gmShare: grandTotal.gmShare,
+    publisherCount: results.length,
+    publishers: results.map(r => ({
+      name: r.name,
+      totalSales: r.totalSales,
+      netAmount: r.netAmount,
+      publisherShare: r.publisherShare,
+      gmShare: r.gmShare,
+      rate: r.rate,
+      rateType: r.rateType
+    }))
+  };
+  localStorage.setItem('gm_settlement_history', JSON.stringify(history));
+}
+
+// ---- 어반 정산 이력 저장 ----
+function saveUrbanHistory(month, data) {
+  const history = JSON.parse(localStorage.getItem('gm_urban_history') || '{}');
+  history[month] = {
+    date: new Date().toISOString(),
+    month: month,
+    ...data
+  };
+  localStorage.setItem('gm_urban_history', JSON.stringify(history));
+}
+
+// ---- 샘플 데이터 (빈 리포트 방지) ----
+function getSettlementHistory() {
+  const existing = localStorage.getItem('gm_settlement_history');
+  if (existing) return JSON.parse(existing);
+
+  // Sample data so report isn't empty
+  const defaults = {
+    '2026-01': {
+      date: '2026-02-10',
+      month: '2026-01',
+      totalSales: 12218310,
+      netSales: 11107554,
+      gmShare: 2997970,
+      publisherShare: 8993910,
+      publisherCount: 5,
+      publishers: [
+        { name: '북극여우', totalSales: 1785600, publisherShare: 1188162, gmShare: 396054, rate: 0.25, rateType: 'net' },
+        { name: '작두', totalSales: 3200000, publisherShare: 2133333, gmShare: 711111, rate: 0.25, rateType: 'net' },
+        { name: '킬러배드로', totalSales: 2100000, publisherShare: 1400000, gmShare: 466667, rate: 0.25, rateType: 'net' },
+        { name: '마루는강쥐', totalSales: 1800000, publisherShare: 1200000, gmShare: 400000, rate: 0.25, rateType: 'net' },
+        { name: '세레나', totalSales: 900000, publisherShare: 600000, gmShare: 200000, rate: 0.25, rateType: 'net' }
+      ]
+    }
+  };
+  localStorage.setItem('gm_settlement_history', JSON.stringify(defaults));
+  return defaults;
+}
+
+// ---- 리포트 로드 ----
+function loadReport() {
+  const period = document.getElementById('report-period') ? document.getElementById('report-period').value : 'monthly';
+  const year = document.getElementById('report-year') ? document.getElementById('report-year').value : '2026';
+
+  renderReportStats(year);
+  renderMonthlyChart(year);
+  renderPublisherSummary(year);
+  renderUrbanHistory(year);
+  renderCostSummary(year);
+}
+
+// ---- 연간 통계 카드 ----
+function renderReportStats(year) {
+  const history = getSettlementHistory();
+  let totalSales = 0, gmShare = 0, pubShare = 0;
+
+  Object.entries(history).forEach(([month, data]) => {
+    if (month.startsWith(year)) {
+      totalSales += data.totalSales || 0;
+      gmShare += data.gmShare || 0;
+      pubShare += data.publisherShare || 0;
+    }
+  });
+
+  // Update stats cards
+  const elSales = document.getElementById('report-year-sales');
+  const elGm = document.getElementById('report-year-gm');
+  const elPub = document.getElementById('report-year-publisher');
+  if (elSales) elSales.textContent = '₩' + totalSales.toLocaleString();
+  if (elGm) elGm.textContent = '₩' + gmShare.toLocaleString();
+  if (elPub) elPub.textContent = '₩' + pubShare.toLocaleString();
+
+  // Urban totals
+  const urbanHistory = JSON.parse(localStorage.getItem('gm_urban_history') || '{}');
+  let urbanTotal = 0;
+  Object.entries(urbanHistory).forEach(([month, data]) => {
+    if (month.startsWith(year)) urbanTotal += data.totalPayment || 0;
+  });
+  const elUrban = document.getElementById('report-year-urban');
+  if (elUrban) elUrban.textContent = '₩' + urbanTotal.toLocaleString();
+}
+
+// ---- 월별 매출 바 차트 ----
+function renderMonthlyChart(year) {
+  const history = getSettlementHistory();
+  const container = document.getElementById('report-monthly-chart');
+  if (!container) return;
+
+  const months = [];
+  for (let m = 1; m <= 12; m++) {
+    const key = year + '-' + String(m).padStart(2, '0');
+    const data = history[key];
+    months.push({
+      month: m,
+      label: m + '월',
+      sales: data ? data.totalSales : 0,
+      gm: data ? data.gmShare : 0
+    });
+  }
+
+  const maxSales = Math.max(...months.map(m => m.sales), 1);
+
+  container.innerHTML = '<div style="display:flex; align-items:flex-end; gap:6px; height:200px; padding:0;">' +
+    months.map(function(m) {
+      var height = m.sales > 0 ? Math.max((m.sales / maxSales) * 100, 5) : 2;
+      var salesStr = m.sales > 1000000 ? (m.sales / 1000000).toFixed(1) + 'M' : m.sales > 1000 ? (m.sales / 1000).toFixed(0) + 'K' : m.sales;
+      return '<div style="flex:1; text-align:center; display:flex; flex-direction:column; justify-content:flex-end; height:100%;">' +
+        '<div style="background:' + (m.sales > 0 ? 'var(--primary)' : 'var(--gray-200)') + '; border-radius:4px 4px 0 0; height:' + height + '%; min-height:4px; transition:height 0.3s;"></div>' +
+        '<div style="font-size:11px; margin-top:4px; font-weight:600;">' + m.label + '</div>' +
+        '<div style="font-size:9px; color:var(--gray-500);">' + (m.sales > 0 ? '₩' + salesStr : '-') + '</div>' +
+      '</div>';
+    }).join('') +
+  '</div>';
+}
+
+// ---- 제작사별 누적 정산 테이블 ----
+function renderPublisherSummary(year) {
+  const history = getSettlementHistory();
+  const byPublisher = {};
+
+  Object.entries(history).forEach(([month, data]) => {
+    if (!month.startsWith(year) || !data.publishers) return;
+    data.publishers.forEach(function(pub) {
+      if (!byPublisher[pub.name]) {
+        byPublisher[pub.name] = { totalSales: 0, publisherShare: 0, gmShare: 0, count: 0 };
+      }
+      byPublisher[pub.name].totalSales += pub.totalSales || 0;
+      byPublisher[pub.name].publisherShare += pub.publisherShare || 0;
+      byPublisher[pub.name].gmShare += pub.gmShare || 0;
+      byPublisher[pub.name].count++;
+    });
+  });
+
+  const sorted = Object.entries(byPublisher).sort(function(a, b) { return b[1].totalSales - a[1].totalSales; });
+  const grandTotal = sorted.reduce(function(acc, entry) {
+    var v = entry[1];
+    return { totalSales: acc.totalSales + v.totalSales, publisherShare: acc.publisherShare + v.publisherShare, gmShare: acc.gmShare + v.gmShare };
+  }, { totalSales: 0, publisherShare: 0, gmShare: 0 });
+
+  const tbody = document.getElementById('report-publisher-table');
+  if (!tbody) return;
+
+  if (sorted.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">정산 데이터가 없습니다. 정산을 실행하면 자동으로 누적됩니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = sorted.map(function(entry) {
+    var name = entry[0], v = entry[1];
+    var pct = grandTotal.totalSales > 0 ? ((v.totalSales / grandTotal.totalSales) * 100).toFixed(1) : 0;
+    return '<tr>' +
+      '<td style="font-weight:600;">' + name + '</td>' +
+      '<td>₩' + v.totalSales.toLocaleString() + '</td>' +
+      '<td style="color:var(--blue);">₩' + v.publisherShare.toLocaleString() + '</td>' +
+      '<td style="color:var(--primary); font-weight:700;">₩' + v.gmShare.toLocaleString() + '</td>' +
+      '<td>' + v.count + '회</td>' +
+      '<td>' + pct + '%</td>' +
+    '</tr>';
+  }).join('');
+
+  var elTotalSales = document.getElementById('report-pub-total-sales');
+  var elTotalShare = document.getElementById('report-pub-total-share');
+  var elTotalGm = document.getElementById('report-pub-total-gm');
+  if (elTotalSales) elTotalSales.textContent = '₩' + grandTotal.totalSales.toLocaleString();
+  if (elTotalShare) elTotalShare.textContent = '₩' + grandTotal.publisherShare.toLocaleString();
+  if (elTotalGm) elTotalGm.textContent = '₩' + grandTotal.gmShare.toLocaleString();
+}
+
+// ---- 어반플레이 정산 이력 테이블 ----
+function renderUrbanHistory(year) {
+  const history = JSON.parse(localStorage.getItem('gm_urban_history') || '{}');
+  const tbody = document.getElementById('report-urban-table');
+  if (!tbody) return;
+
+  const entries = Object.entries(history).filter(function(e) { return e[0].startsWith(year); }).sort(function(a, b) { return a[0].localeCompare(b[0]); });
+
+  if (entries.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">어반플레이 정산 데이터가 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = entries.map(function(entry) {
+    var month = entry[0], d = entry[1];
+    return '<tr>' +
+      '<td style="font-weight:600;">' + month.replace('-', '년 ') + '월</td>' +
+      '<td>₩' + (d.revenue || 0).toLocaleString() + '</td>' +
+      '<td>₩' + (d.costs || 0).toLocaleString() + '</td>' +
+      '<td style="font-weight:700;">₩' + (d.netProfit || 0).toLocaleString() + '</td>' +
+      '<td>₩' + (d.urbanShare || 0).toLocaleString() + '</td>' +
+      '<td style="color:var(--primary); font-weight:700;">₩' + (d.gmShare || 0).toLocaleString() + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// ---- 비용 요약 ----
+function renderCostSummary(year) {
+  // From HR data
+  const hrData = JSON.parse(localStorage.getItem('gm_hr_data') || '{}');
+  let totalLabor = 0;
+  Object.values(hrData).forEach(function(staff) {
+    if (staff.status === '퇴직' || staff.isPending) return;
+    const pay = parseInt(staff.payAmount) || 0;
+    const type = staff.payType || 'monthly';
+    totalLabor += type === 'hourly' || type === '시급' ? pay * 209 : pay;
+  });
+  totalLabor *= 12; // annualize roughly
+
+  const el1 = document.getElementById('report-total-labor');
+  if (el1) el1.textContent = '₩' + totalLabor.toLocaleString();
+
+  // Supplies from urban history
+  const urbanHistory = JSON.parse(localStorage.getItem('gm_urban_history') || '{}');
+  let totalSupplies = 0;
+  Object.entries(urbanHistory).forEach(function(entry) {
+    if (entry[0].startsWith(year)) {
+      totalSupplies += entry[1].suppliesCost || 0;
+    }
+  });
+  const el2 = document.getElementById('report-total-supplies');
+  if (el2) el2.textContent = '₩' + totalSupplies.toLocaleString();
 }

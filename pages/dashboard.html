@@ -82,21 +82,21 @@
 
         <div class="nav-section" id="nav-admin-section">
           <div class="nav-section-title">ADMIN</div>
-          <a class="nav-item" data-page="settlement" onclick="navigateTo('settlement')">
-            <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-            정산
+          <a class="nav-item" data-page="report" onclick="navigateTo('report')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="15" x2="8" y2="9"/><line x1="12" y1="15" x2="12" y2="7"/><line x1="16" y1="15" x2="16" y2="11"/></svg>
+            경영 리포트
           </a>
           <a class="nav-item" data-page="hr" onclick="navigateTo('hr')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
-            인사관리
-          </a>
-          <a class="nav-item" data-page="admin" onclick="navigateTo('admin')">
-            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-            조직관리
+            인사/조직관리
           </a>
           <a class="nav-item" data-page="clients" onclick="navigateTo('clients')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
             거래처 관리
+          </a>
+          <a class="nav-item" data-page="settlement" onclick="navigateTo('settlement')">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+            정산
           </a>
         </div>
       </nav>
@@ -1452,6 +1452,114 @@
                     <tr><td colspan="7" class="empty-state">등록된 계약이 없습니다.</td></tr>
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ===== REPORT (경영 리포트) ===== -->
+      <div id="section-report" class="page-section" style="display:none;">
+        <div class="page-header">
+          <div>
+            <h1>경영 리포트</h1>
+            <div class="header-sub">매출, 정산, 비용 누적 현황</div>
+          </div>
+        </div>
+        <div class="page-body">
+
+          <!-- Period Selector -->
+          <div style="display:flex; gap:8px; align-items:center; margin-bottom:20px;">
+            <select id="report-period" style="padding:8px 12px; border:1px solid var(--gray-200); border-radius:6px; font-family:inherit; font-size:13px;">
+              <option value="monthly">월별</option>
+              <option value="quarterly">분기별</option>
+              <option value="half">상반기/하반기</option>
+              <option value="yearly">연간</option>
+            </select>
+            <select id="report-year" style="padding:8px 12px; border:1px solid var(--gray-200); border-radius:6px; font-family:inherit; font-size:13px;">
+              <option value="2026">2026년</option>
+              <option value="2025">2025년</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="loadReport()">조회</button>
+          </div>
+
+          <!-- Stats Cards -->
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px;">
+            <div class="card" style="border:none; box-shadow:none; background:var(--primary-bg);">
+              <div class="card-body" style="padding:14px; text-align:center;">
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600; margin-bottom:4px;">올해 총매출</div>
+                <div style="font-size:22px; font-weight:800; color:var(--primary);" id="report-year-sales">₩0</div>
+              </div>
+            </div>
+            <div class="card" style="border:none; box-shadow:none; background:var(--green-bg);">
+              <div class="card-body" style="padding:14px; text-align:center;">
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600; margin-bottom:4px;">올해 GM 수익</div>
+                <div style="font-size:22px; font-weight:800; color:var(--green);" id="report-year-gm">₩0</div>
+              </div>
+            </div>
+            <div class="card" style="border:none; box-shadow:none; background:var(--blue-bg);">
+              <div class="card-body" style="padding:14px; text-align:center;">
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600; margin-bottom:4px;">올해 제작사 정산</div>
+                <div style="font-size:22px; font-weight:800; color:var(--blue);" id="report-year-publisher">₩0</div>
+              </div>
+            </div>
+            <div class="card" style="border:none; box-shadow:none; background:var(--yellow-bg);">
+              <div class="card-body" style="padding:14px; text-align:center;">
+                <div style="font-size:11px; color:var(--gray-500); font-weight:600; margin-bottom:4px;">올해 어반 정산</div>
+                <div style="font-size:22px; font-weight:800; color:#B8860B;" id="report-year-urban">₩0</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section A: 월별 매출 추이 -->
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-header"><h3>월별 매출 추이</h3></div>
+            <div class="card-body" id="report-monthly-chart">
+              <div class="empty-state"><p>조회 버튼을 눌러주세요.</p></div>
+            </div>
+          </div>
+
+          <!-- Section B: 제작사별 누적 정산 -->
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-header"><h3>제작사별 누적 정산</h3></div>
+            <div class="table-container">
+              <table>
+                <thead><tr><th>제작사</th><th>총매출</th><th>제작사 정산</th><th>GM 수익</th><th>정산 횟수</th><th>비중</th></tr></thead>
+                <tbody id="report-publisher-table">
+                  <tr><td colspan="6" class="empty-state">정산 데이터가 없습니다. 정산을 실행하면 자동으로 누적됩니다.</td></tr>
+                </tbody>
+                <tfoot><tr style="font-weight:800;"><td>합계</td><td id="report-pub-total-sales">-</td><td id="report-pub-total-share">-</td><td id="report-pub-total-gm">-</td><td>-</td><td>100%</td></tr></tfoot>
+              </table>
+            </div>
+          </div>
+
+          <!-- Section C: 어반플레이 정산 이력 -->
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-header"><h3>어반플레이 정산 이력</h3></div>
+            <div class="table-container">
+              <table>
+                <thead><tr><th>월</th><th>매출</th><th>비용</th><th>순익</th><th>어반 몫</th><th>GM 몫</th></tr></thead>
+                <tbody id="report-urban-table">
+                  <tr><td colspan="6" class="empty-state">어반플레이 정산 데이터가 없습니다.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Section D: 비용 요약 -->
+          <div class="card">
+            <div class="card-header"><h3>비용 요약</h3></div>
+            <div class="card-body">
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div>
+                  <div style="font-size:13px; color:var(--gray-500); margin-bottom:4px;">총 인건비 (올해)</div>
+                  <div style="font-size:24px; font-weight:800;" id="report-total-labor">-</div>
+                </div>
+                <div>
+                  <div style="font-size:13px; color:var(--gray-500); margin-bottom:4px;">총 소모품비 (올해)</div>
+                  <div style="font-size:24px; font-weight:800;" id="report-total-supplies">-</div>
+                </div>
               </div>
             </div>
           </div>
