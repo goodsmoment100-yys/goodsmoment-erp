@@ -6,10 +6,11 @@
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
 
 :root {
-  --red: #2EC4B6;
-  --red-dark: #25A99D;
-  --red-light: #5DD9CD;
-  --red-bg: #F0FDFB;
+  --primary: #2EC4B6;
+  --primary-dark: #25A99D;
+  --primary-light: #5DD4C8;
+  --primary-bg: #F0FFFE;
+  --red: #FF3B30;
   --black: #0A0A0A;
   --gray-900: #1A1A1A;
   --gray-800: #2D2D2D;
@@ -73,7 +74,7 @@ body {
   right: -20%;
   width: 600px;
   height: 600px;
-  background: radial-gradient(circle, var(--red-bg) 0%, transparent 70%);
+  background: radial-gradient(circle, var(--primary-bg) 0%, transparent 70%);
   border-radius: 50%;
 }
 
@@ -93,7 +94,7 @@ body {
 .login-logo .logo-icon {
   width: 48px;
   height: 48px;
-  background: var(--red);
+  background: var(--primary);
   border-radius: var(--radius-md);
   display: inline-flex;
   align-items: center;
@@ -146,8 +147,8 @@ body {
 }
 
 .form-group input:focus {
-  border-color: var(--red);
-  box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.1);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(46, 196, 182, 0.15);
 }
 
 .form-group input::placeholder {
@@ -171,15 +172,15 @@ body {
 }
 
 .btn-primary {
-  background: var(--red);
+  background: var(--primary);
   color: var(--white);
   width: 100%;
 }
 
 .btn-primary:hover {
-  background: var(--red-dark);
+  background: var(--primary-dark);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 59, 48, 0.3);
+  box-shadow: 0 4px 12px rgba(46, 196, 182, 0.3);
 }
 
 .btn-secondary {
@@ -213,7 +214,7 @@ body {
 }
 
 .login-footer a {
-  color: var(--red);
+  color: var(--primary);
   text-decoration: none;
   font-weight: 500;
   font-size: 13px;
@@ -224,7 +225,7 @@ body {
 }
 
 .login-error {
-  background: var(--red-bg);
+  background: #FFF5F5;
   color: var(--red);
   padding: 12px 16px;
   border-radius: var(--radius-md);
@@ -267,7 +268,7 @@ body {
 .sidebar-logo .logo-dot {
   width: 36px;
   height: 36px;
-  background: var(--red);
+  background: var(--primary);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
@@ -336,8 +337,8 @@ body {
 }
 
 .nav-item.active {
-  background: var(--red-bg);
-  color: var(--red);
+  background: var(--primary-bg);
+  color: var(--primary);
   font-weight: 600;
 }
 
@@ -349,7 +350,7 @@ body {
   transform: translateY(-50%);
   width: 3px;
   height: 20px;
-  background: var(--red);
+  background: var(--primary);
   border-radius: 0 3px 3px 0;
 }
 
@@ -364,7 +365,7 @@ body {
 
 .nav-badge {
   margin-left: auto;
-  background: var(--red);
+  background: var(--primary);
   color: var(--white);
   font-size: 11px;
   font-weight: 700;
@@ -427,8 +428,8 @@ body {
 }
 
 .sidebar-user .logout-btn:hover {
-  background: var(--red-bg);
-  color: var(--red);
+  background: var(--primary-bg);
+  color: var(--primary);
 }
 
 /* Main Content */
@@ -541,7 +542,7 @@ body {
   stroke-width: 1.8;
 }
 
-.stat-card .stat-icon.red { background: var(--red-bg); color: var(--red); }
+.stat-card .stat-icon.red { background: var(--primary-bg); color: var(--primary); }
 .stat-card .stat-icon.green { background: var(--green-bg); color: var(--green); }
 .stat-card .stat-icon.blue { background: var(--blue-bg); color: var(--blue); }
 .stat-card .stat-icon.yellow { background: var(--yellow-bg); color: var(--yellow); }
@@ -589,7 +590,7 @@ body {
 }
 
 .btn-clock-in {
-  background: var(--red);
+  background: var(--primary);
   color: var(--white);
   padding: 16px 48px;
   font-size: 16px;
@@ -601,9 +602,9 @@ body {
 }
 
 .btn-clock-in:hover {
-  background: var(--red-dark);
+  background: var(--primary-dark);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 59, 48, 0.3);
+  box-shadow: 0 6px 20px rgba(46, 196, 182, 0.3);
 }
 
 .btn-clock-in:disabled {
@@ -719,7 +720,7 @@ table tbody tr:last-child td {
 
 .badge-pending { background: var(--yellow-bg); color: #B8860B; }
 .badge-approved { background: var(--green-bg); color: var(--green); }
-.badge-rejected { background: var(--red-bg); color: var(--red); }
+.badge-rejected { background: #FFF5F5; color: var(--red); }
 
 /* ============================================
    NOTICE BOARD
@@ -863,8 +864,8 @@ table tbody tr:last-child td {
 
 .form-group select:focus,
 .form-group textarea:focus {
-  border-color: var(--red);
-  box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.1);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(46, 196, 182, 0.15);
 }
 
 .form-group textarea {
@@ -1044,7 +1045,7 @@ table tbody tr:last-child td {
 .approval-type {
   font-size: 12px;
   font-weight: 600;
-  color: var(--red);
+  color: var(--primary);
   margin-bottom: 2px;
 }
 
@@ -1090,8 +1091,8 @@ table tbody tr:last-child td {
 }
 
 .tab-item.active {
-  color: var(--red);
-  border-bottom-color: var(--red);
+  color: var(--primary);
+  border-bottom-color: var(--primary);
   font-weight: 600;
 }
 

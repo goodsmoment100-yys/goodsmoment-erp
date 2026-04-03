@@ -52,13 +52,9 @@
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             공지사항
           </a>
-        </div>
-
-        <div class="nav-section">
-          <div class="nav-section-title">RESOURCES</div>
           <a class="nav-item" data-page="resources" onclick="navigateTo('resources')">
             <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-            양식함
+            자료실
           </a>
         </div>
 
@@ -477,19 +473,19 @@
         </div>
       </div>
 
-      <!-- ===== RESOURCES (양식함) ===== -->
+      <!-- ===== RESOURCES (자료실) ===== -->
       <div id="section-resources" class="page-section" style="display:none;">
         <div class="page-header">
           <div>
-            <h1>양식함</h1>
-            <div class="header-sub">회사 로고, PPT 템플릿, 제안서 양식 다운로드</div>
+            <h1>자료실</h1>
+            <div class="header-sub">회사 로고, 문서 양식, 공유 자료 다운로드</div>
           </div>
         </div>
         <div class="page-body">
           <!-- CI / Logo -->
           <div class="card" style="margin-bottom:24px;">
             <div class="card-header">
-              <h3>회사 로고 / CI</h3>
+              <h3>회사 로고</h3>
             </div>
             <div class="card-body">
               <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:20px;">
@@ -499,7 +495,7 @@
                   </div>
                   <div style="font-weight:600; font-size:14px; margin-bottom:4px;">로고 (블랙)</div>
                   <div style="font-size:12px; color:var(--gray-400); margin-bottom:12px;">밝은 배경용 PNG</div>
-                  <a href="../logo_black.png" download="birchsound_logo_black.png" class="btn btn-secondary btn-sm">다운로드</a>
+                  <a href="../logo_black.png" download="goodsmoment_logo_black.png" class="btn btn-secondary btn-sm">다운로드</a>
                 </div>
                 <div style="text-align:center; padding:32px 20px; background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-md);">
                   <div style="background:var(--gray-900); padding:24px; border-radius:var(--radius-sm); margin-bottom:16px;">
@@ -507,25 +503,13 @@
                   </div>
                   <div style="font-weight:600; font-size:14px; margin-bottom:4px;">로고 (화이트)</div>
                   <div style="font-size:12px; color:var(--gray-400); margin-bottom:12px;">어두운 배경용 PNG</div>
-                  <a href="../logo_white.png" download="birchsound_logo_white.png" class="btn btn-secondary btn-sm">다운로드</a>
-                </div>
-                <div style="text-align:center; padding:32px 20px; background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-md);">
-                  <div style="padding:24px; border-radius:var(--radius-sm); margin-bottom:16px;">
-                    <div style="display:flex; gap:8px; justify-content:center; align-items:center;">
-                      <div style="width:40px; height:40px; border-radius:8px; background:#FF3B30;"></div>
-                      <div style="width:40px; height:40px; border-radius:8px; background:#0A0A0A;"></div>
-                      <div style="width:40px; height:40px; border-radius:8px; background:#F2F2F2; border:1px solid var(--gray-200);"></div>
-                    </div>
-                  </div>
-                  <div style="font-weight:600; font-size:14px; margin-bottom:4px;">브랜드 컬러</div>
-                  <div style="font-size:12px; color:var(--gray-400); margin-bottom:12px;">#FF3B30 / #0A0A0A / #F2F2F2</div>
-                  <button class="btn btn-secondary btn-sm" onclick="copyColor()">컬러코드 복사</button>
+                  <a href="../logo_white.png" download="goodsmoment_logo_white.png" class="btn btn-secondary btn-sm">다운로드</a>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Templates -->
+          <!-- 문서 양식 -->
           <div class="card" style="margin-bottom:24px;">
             <div class="card-header">
               <h3>문서 양식</h3>
@@ -533,40 +517,12 @@
             </div>
             <div class="card-body" style="padding:0;">
               <div id="template-list">
-                <div class="notice-item" onclick="downloadTemplate('proposal')">
-                  <div>
-                    <span class="notice-tag" style="background:var(--red); color:white;">PPT</span>
-                    <span class="notice-title">제안서 기본 양식</span>
-                  </div>
-                  <div class="notice-meta">표지 + 회사소개 + 제안내용 + 포트폴리오</div>
-                </div>
-                <div class="notice-item" onclick="downloadTemplate('sponsorship')">
-                  <div>
-                    <span class="notice-tag" style="background:var(--red); color:white;">PPT</span>
-                    <span class="notice-title">스폰서십 제안서</span>
-                  </div>
-                  <div class="notice-meta">후원/협찬 제안용 템플릿</div>
-                </div>
-                <div class="notice-item" onclick="downloadTemplate('artist')">
-                  <div>
-                    <span class="notice-tag" style="background:var(--red); color:white;">PPT</span>
-                    <span class="notice-title">아티스트 초청 제안서</span>
-                  </div>
-                  <div class="notice-meta">아티스트/에이전시 협업 제안용</div>
-                </div>
                 <div class="notice-item" onclick="downloadTemplate('meeting')">
                   <div>
                     <span class="notice-tag" style="background:var(--blue); color:white;">DOC</span>
                     <span class="notice-title">회의록 양식</span>
                   </div>
                   <div class="notice-meta">날짜/참석자/안건/결정사항/후속조치</div>
-                </div>
-                <div class="notice-item" onclick="downloadTemplate('contract')">
-                  <div>
-                    <span class="notice-tag" style="background:var(--gray-700); color:white;">DOC</span>
-                    <span class="notice-title">계약서 기본 양식</span>
-                  </div>
-                  <div class="notice-meta">공연/행사 관련 기본 계약서</div>
                 </div>
                 <div class="notice-item" onclick="downloadTemplate('expense')">
                   <div>
@@ -575,37 +531,32 @@
                   </div>
                   <div class="notice-meta">프로젝트별 지출 결의서 양식</div>
                 </div>
+                <div class="notice-item" onclick="downloadTemplate('contract')">
+                  <div>
+                    <span class="notice-tag" style="background:var(--gray-700); color:white;">DOC</span>
+                    <span class="notice-title">계약서 기본 양식</span>
+                  </div>
+                  <div class="notice-meta">입점/위탁 관련 기본 계약서</div>
+                </div>
+                <div class="notice-item" onclick="downloadTemplate('inventory')">
+                  <div>
+                    <span class="notice-tag" style="background:var(--yellow); color:var(--black);">XLS</span>
+                    <span class="notice-title">재고 관리 양식</span>
+                  </div>
+                  <div class="notice-meta">상품 입출고/재고 현황 기록용</div>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Brand Guide -->
+          <!-- 공유 링크 -->
           <div class="card">
             <div class="card-header">
-              <h3>브랜드 가이드</h3>
+              <h3>공유 자료</h3>
+              <span style="font-size:12px; color:var(--gray-400);">팀 공유 링크 및 문서</span>
             </div>
             <div class="card-body">
-              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px;">
-                <div>
-                  <h4 style="font-size:14px; font-weight:700; margin-bottom:12px;">Typography</h4>
-                  <div style="padding:16px; background:var(--gray-50); border-radius:var(--radius-sm);">
-                    <div style="font-family:'Pretendard Variable',sans-serif; font-size:24px; font-weight:800; margin-bottom:8px;">Pretendard Bold</div>
-                    <div style="font-family:'Pretendard Variable',sans-serif; font-size:18px; margin-bottom:8px;">프리텐다드 본문 텍스트</div>
-                    <div style="font-size:12px; color:var(--gray-500);">영문/한글 통합: Pretendard Variable</div>
-                  </div>
-                </div>
-                <div>
-                  <h4 style="font-size:14px; font-weight:700; margin-bottom:12px;">Color Palette</h4>
-                  <div style="padding:16px; background:var(--gray-50); border-radius:var(--radius-sm);">
-                    <div style="display:flex; gap:8px; margin-bottom:12px;">
-                      <div style="flex:1; height:48px; background:#FF3B30; border-radius:6px; display:flex; align-items:center; justify-content:center; color:white; font-size:11px; font-weight:600;">PRIMARY</div>
-                      <div style="flex:1; height:48px; background:#0A0A0A; border-radius:6px; display:flex; align-items:center; justify-content:center; color:white; font-size:11px; font-weight:600;">BLACK</div>
-                      <div style="flex:1; height:48px; background:#F2F2F2; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#666; font-size:11px; font-weight:600; border:1px solid #ddd;">LIGHT</div>
-                    </div>
-                    <div style="font-size:12px; color:var(--gray-500);">#FF3B30 / #0A0A0A / #F2F2F2</div>
-                  </div>
-                </div>
-              </div>
+              <div class="empty-state"><p>등록된 공유 자료가 없습니다.</p></div>
             </div>
           </div>
         </div>

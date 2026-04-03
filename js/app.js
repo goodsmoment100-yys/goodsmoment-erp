@@ -601,12 +601,9 @@ async function loadMembers() {
         <select onchange="changeDepartment('${m.id}', this.value)" style="padding:4px 8px; border:1px solid var(--gray-200); border-radius:4px; font-size:12px;">
           <option value="" ${!m.department ? 'selected' : ''}>미지정</option>
           <option value="경영" ${m.department === '경영' ? 'selected' : ''}>경영</option>
-          <option value="기획" ${m.department === '기획' ? 'selected' : ''}>기획</option>
-          <option value="제작" ${m.department === '제작' ? 'selected' : ''}>제작</option>
-          <option value="아티스트" ${m.department === '아티스트' ? 'selected' : ''}>아티스트</option>
-          <option value="마케팅" ${m.department === '마케팅' ? 'selected' : ''}>마케팅</option>
-          <option value="디자인" ${m.department === '디자인' ? 'selected' : ''}>디자인</option>
-          <option value="기술" ${m.department === '기술' ? 'selected' : ''}>기술</option>
+          <option value="매장" ${m.department === '매장' ? 'selected' : ''}>매장</option>
+          <option value="사무실" ${m.department === '사무실' ? 'selected' : ''}>사무실</option>
+          <option value="기타" ${m.department === '기타' ? 'selected' : ''}>기타</option>
         </select>
       </td>
     </tr>`;
