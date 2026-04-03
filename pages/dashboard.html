@@ -378,7 +378,7 @@
         <div class="page-header">
           <div>
             <h1>결재</h1>
-            <div class="header-sub">휴가, 지출, 업무보고 결재 관리</div>
+            <div class="header-sub">연차, 휴가, 지출, 구매 요청 등 전자결재</div>
           </div>
           <div class="header-actions">
             <button class="btn btn-primary btn-sm" onclick="openModal('approval-modal')">
@@ -1557,26 +1557,70 @@
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label>유형</label>
-          <select id="approval-type">
-            <option value="leave">휴가</option>
-            <option value="expense">지출</option>
-            <option value="report">업무보고</option>
+          <label>결재 종류</label>
+          <select id="approval-type" onchange="onApprovalTypeChange()">
+            <option value="leave">연차 신청</option>
+            <option value="vacation">휴가 신청 (반차/병가/경조사 등)</option>
+            <option value="expense">지출 결의 (경비 청구)</option>
+            <option value="purchase">구매 요청</option>
+            <option value="report">업무 보고</option>
             <option value="other">기타</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>결재자</label>
+          <select id="approval-approver">
+            <option value="">자동 배정</option>
           </select>
         </div>
         <div class="form-group">
           <label>제목</label>
           <input type="text" id="approval-title" placeholder="결재 제목">
         </div>
+        <div id="approval-date-fields" style="display:block;">
+          <div class="form-group" style="display:flex; gap:8px;">
+            <div style="flex:1;">
+              <label>시작일</label>
+              <input type="date" id="approval-start-date">
+            </div>
+            <div style="flex:1;">
+              <label>종료일</label>
+              <input type="date" id="approval-end-date">
+            </div>
+          </div>
+        </div>
+        <div id="approval-amount-field" style="display:none;">
+          <div class="form-group">
+            <label>금액 (원)</label>
+            <input type="number" id="approval-amount" placeholder="금액을 입력하세요" min="0">
+          </div>
+        </div>
         <div class="form-group">
-          <label>내용</label>
+          <label>상세 내용</label>
           <textarea id="approval-content" placeholder="상세 내용을 입력하세요"></textarea>
+        </div>
+        <div class="form-group">
+          <label>첨부 메모</label>
+          <textarea id="approval-attachment-memo" placeholder="영수증 설명, 첨부파일 메모 등" rows="2"></textarea>
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary btn-sm" onclick="closeModal('approval-modal')">취소</button>
         <button class="btn btn-primary btn-sm" onclick="submitApproval()">요청</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Approval Detail Modal -->
+  <div class="modal-overlay" id="approval-detail-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>결재 상세</h3>
+        <button class="modal-close" onclick="closeModal('approval-detail-modal')">&times;</button>
+      </div>
+      <div class="modal-body" id="approval-detail-content">
+      </div>
+      <div class="modal-footer" id="approval-detail-actions">
       </div>
     </div>
   </div>
@@ -2515,8 +2559,25 @@
       const type = document.getElementById('approval-type').value;
       const title = document.getElementById('approval-title').value.trim();
       const content = document.getElementById('approval-content').value.trim();
+      const approver = document.getElementById('approval-approver').value;
+      const startDate = document.getElementById('approval-start-date').value;
+      const endDate = document.getElementById('approval-end-date').value;
+      const amount = document.getElementById('approval-amount').value;
+      const attachmentMemo = document.getElementById('approval-attachment-memo').value.trim();
       if (!title) { showToast('제목을 입력해주세요.', 'error'); return; }
-      createApproval(type, title, content);
+      if ((type === 'leave' || type === 'vacation') && (!startDate || !endDate)) {
+        showToast('기간을 입력해주세요.', 'error'); return;
+      }
+      if ((type === 'expense' || type === 'purchase') && !amount) {
+        showToast('금액을 입력해주세요.', 'error'); return;
+      }
+      createApproval(type, title, content, {
+        approver_id: approver || null,
+        start_date: startDate || null,
+        end_date: endDate || null,
+        amount: amount ? parseInt(amount) : null,
+        attachment_memo: attachmentMemo || null
+      });
     }
 
     function submitSettlement() {

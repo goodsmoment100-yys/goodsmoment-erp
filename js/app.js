@@ -300,9 +300,38 @@ async function viewNotice(id) {
 }
 
 // ---- Approvals ----
+const APPROVAL_TYPES = {
+  'leave': { label: '연차 신청', color: '#2563EB' },
+  'vacation': { label: '휴가 신청', color: '#9333EA' },
+  'expense': { label: '지출 결의', color: '#16A34A' },
+  'purchase': { label: '구매 요청', color: '#EA580C' },
+  'report': { label: '업무 보고', color: '#6B7280' },
+  'other': { label: '기타', color: '#6B7280' }
+};
+
+function onApprovalTypeChange() {
+  const type = document.getElementById('approval-type').value;
+  const dateFields = document.getElementById('approval-date-fields');
+  const amountField = document.getElementById('approval-amount-field');
+  if (dateFields) dateFields.style.display = (type === 'leave' || type === 'vacation') ? 'block' : 'none';
+  if (amountField) amountField.style.display = (type === 'expense' || type === 'purchase') ? 'block' : 'none';
+}
+
+async function loadApprovalApprovers() {
+  const select = document.getElementById('approval-approver');
+  if (!select) return;
+  const { data } = await sb.from('profiles').select('id, name, role').order('name');
+  if (!data) return;
+  select.innerHTML = '<option value="">자동 배정</option>' +
+    data.map(p => `<option value="${p.id}">${p.name}${p.role === 'ceo' ? ' (대표)' : p.role === 'admin' ? ' (본부장)' : ''}</option>`).join('');
+}
+
 async function loadApprovals(filter = 'all') {
   const user = await getCurrentUser();
   if (!user) return;
+
+  // Load approvers for the modal
+  loadApprovalApprovers();
 
   let query = sb
     .from('approvals')
@@ -326,44 +355,69 @@ async function loadApprovals(filter = 'all') {
   }
 
   list.innerHTML = data.map(item => {
-    const typeMap = { leave: '휴가', expense: '지출', report: '업무보고', other: '기타' };
+    const typeInfo = APPROVAL_TYPES[item.type] || { label: item.type, color: '#6B7280' };
     const date = new Date(item.created_at).toLocaleDateString('ko-KR');
     const requesterName = item.profiles ? item.profiles.name : '알 수 없음';
+    const statusLabel = item.status === 'pending' ? '대기중' : item.status === 'approved' ? '승인' : '반려';
+    const statusColor = item.status === 'pending' ? '#B8860B' : item.status === 'approved' ? '#16A34A' : '#DC2626';
+    const statusBg = item.status === 'pending' ? 'var(--yellow-bg, #FEF3C7)' : item.status === 'approved' ? '#DCFCE7' : '#FEE2E2';
 
-    return `<div class="approval-item">
-      <div class="approval-info">
-        <div class="approval-type">${typeMap[item.type] || item.type}</div>
-        <div class="approval-title">${item.title}</div>
-        <div class="approval-meta">${requesterName} · ${date}</div>
+    let extraInfo = '';
+    if ((item.type === 'expense' || item.type === 'purchase') && item.amount) {
+      extraInfo += `<span style="font-size:12px; color:var(--gray-500); margin-left:8px;">${Number(item.amount).toLocaleString()}원</span>`;
+    }
+    if ((item.type === 'leave' || item.type === 'vacation') && item.start_date) {
+      extraInfo += `<span style="font-size:12px; color:var(--gray-500); margin-left:8px;">${item.start_date} ~ ${item.end_date || ''}</span>`;
+    }
+
+    return `<div class="approval-item" style="cursor:pointer; padding:12px 16px; border-bottom:1px solid var(--gray-100, #f3f4f6); display:flex; align-items:center; justify-content:space-between;" onclick="openApprovalDetail('${item.id}')">
+      <div class="approval-info" style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
+        <span style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; color:white; background:${typeInfo.color}; white-space:nowrap;">${typeInfo.label}</span>
+        <div style="min-width:0; flex:1;">
+          <div class="approval-title" style="font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.title}${extraInfo}</div>
+          <div class="approval-meta" style="font-size:12px; color:var(--gray-500, #6b7280);">${requesterName} · ${date}</div>
+        </div>
       </div>
       <div>
-        <span class="badge badge-${item.status}">${item.status === 'pending' ? '대기중' : item.status === 'approved' ? '승인' : '반려'}</span>
+        <span style="display:inline-block; padding:2px 10px; border-radius:4px; font-size:12px; font-weight:600; color:${statusColor}; background:${statusBg};">${statusLabel}</span>
       </div>
     </div>`;
   }).join('');
 }
 
-async function createApproval(type, title, content) {
+async function createApproval(type, title, content, extras = {}) {
   const user = await getCurrentUser();
   if (!user) return;
 
-  // Get first admin/ceo as approver
-  const { data: admins } = await sb
-    .from('profiles')
-    .select('id')
-    .in('role', ['admin', 'ceo'])
-    .limit(1);
+  let approverId = extras.approver_id;
 
-  const approverId = admins && admins.length > 0 ? admins[0].id : user.id;
+  if (!approverId) {
+    // Get first admin/ceo as approver
+    const { data: admins } = await sb
+      .from('profiles')
+      .select('id')
+      .in('role', ['admin', 'ceo'])
+      .limit(1);
 
-  const { error } = await sb.from('approvals').insert({
+    approverId = admins && admins.length > 0 ? admins[0].id : user.id;
+  }
+
+  const insertData = {
     requester_id: user.id,
     approver_id: approverId,
     type,
     title,
     content,
     status: 'pending'
-  });
+  };
+
+  // Add optional fields if supported by the DB
+  if (extras.start_date) insertData.start_date = extras.start_date;
+  if (extras.end_date) insertData.end_date = extras.end_date;
+  if (extras.amount) insertData.amount = extras.amount;
+  if (extras.attachment_memo) insertData.attachment_memo = extras.attachment_memo;
+
+  const { error } = await sb.from('approvals').insert(insertData);
 
   if (error) {
     showToast('결재 요청 실패: ' + error.message, 'error');
@@ -372,13 +426,27 @@ async function createApproval(type, title, content) {
 
   showToast('결재가 요청되었습니다.', 'success');
   closeModal('approval-modal');
+  // Reset form fields
+  document.getElementById('approval-title').value = '';
+  document.getElementById('approval-content').value = '';
+  document.getElementById('approval-type').value = 'leave';
+  if (document.getElementById('approval-start-date')) document.getElementById('approval-start-date').value = '';
+  if (document.getElementById('approval-end-date')) document.getElementById('approval-end-date').value = '';
+  if (document.getElementById('approval-amount')) document.getElementById('approval-amount').value = '';
+  if (document.getElementById('approval-attachment-memo')) document.getElementById('approval-attachment-memo').value = '';
+  onApprovalTypeChange();
   loadApprovals();
 }
 
-async function handleApproval(id, status) {
+async function handleApproval(id, status, rejectReason) {
+  const updateData = { status, decided_at: new Date().toISOString() };
+  if (status === 'rejected' && rejectReason) {
+    updateData.reject_reason = rejectReason;
+  }
+
   const { error } = await sb
     .from('approvals')
-    .update({ status, decided_at: new Date().toISOString() })
+    .update(updateData)
     .eq('id', id);
 
   if (error) {
@@ -387,7 +455,119 @@ async function handleApproval(id, status) {
   }
 
   showToast(status === 'approved' ? '승인되었습니다.' : '반려되었습니다.', 'success');
+  closeModal('approval-detail-modal');
   loadApprovals();
+}
+
+async function openApprovalDetail(id) {
+  const { data: item } = await sb
+    .from('approvals')
+    .select('*, profiles!approvals_requester_id_fkey(name)')
+    .eq('id', id)
+    .single();
+
+  if (!item) { showToast('결재를 찾을 수 없습니다.', 'error'); return; }
+
+  const user = await getCurrentUser();
+  const typeInfo = APPROVAL_TYPES[item.type] || { label: item.type, color: '#6B7280' };
+  const date = new Date(item.created_at).toLocaleDateString('ko-KR');
+  const requesterName = item.profiles ? item.profiles.name : '알 수 없음';
+  const statusLabel = item.status === 'pending' ? '대기중' : item.status === 'approved' ? '승인' : '반려';
+  const statusColor = item.status === 'pending' ? '#B8860B' : item.status === 'approved' ? '#16A34A' : '#DC2626';
+  const statusBg = item.status === 'pending' ? 'var(--yellow-bg, #FEF3C7)' : item.status === 'approved' ? '#DCFCE7' : '#FEE2E2';
+
+  let detailHtml = `
+    <div style="margin-bottom:16px; display:flex; align-items:center; gap:10px;">
+      <span style="display:inline-block; padding:3px 10px; border-radius:4px; font-size:12px; font-weight:600; color:white; background:${typeInfo.color};">${typeInfo.label}</span>
+      <span style="display:inline-block; padding:3px 10px; border-radius:4px; font-size:12px; font-weight:600; color:${statusColor}; background:${statusBg};">${statusLabel}</span>
+    </div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px; color:var(--gray-500); margin-bottom:2px;">제목</div>
+      <div style="font-weight:600; font-size:16px;">${item.title}</div>
+    </div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px; color:var(--gray-500); margin-bottom:2px;">요청자</div>
+      <div>${requesterName}</div>
+    </div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px; color:var(--gray-500); margin-bottom:2px;">요청일</div>
+      <div>${date}</div>
+    </div>`;
+
+  if ((item.type === 'leave' || item.type === 'vacation') && item.start_date) {
+    detailHtml += `
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px; color:var(--gray-500); margin-bottom:2px;">기간</div>
+      <div>${item.start_date} ~ ${item.end_date || ''}</div>
+    </div>`;
+  }
+
+  if ((item.type === 'expense' || item.type === 'purchase') && item.amount) {
+    detailHtml += `
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px; color:var(--gray-500); margin-bottom:2px;">금액</div>
+      <div style="font-weight:600;">${Number(item.amount).toLocaleString()}원</div>
+    </div>`;
+  }
+
+  if (item.content) {
+    detailHtml += `
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px; color:var(--gray-500); margin-bottom:2px;">상세 내용</div>
+      <div style="white-space:pre-wrap; background:var(--gray-50, #f9fafb); padding:10px; border-radius:6px; font-size:13px;">${item.content}</div>
+    </div>`;
+  }
+
+  if (item.attachment_memo) {
+    detailHtml += `
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px; color:var(--gray-500); margin-bottom:2px;">첨부 메모</div>
+      <div style="white-space:pre-wrap; background:var(--gray-50, #f9fafb); padding:10px; border-radius:6px; font-size:13px;">${item.attachment_memo}</div>
+    </div>`;
+  }
+
+  if (item.status === 'rejected' && item.reject_reason) {
+    detailHtml += `
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px; color:#DC2626; margin-bottom:2px;">반려 사유</div>
+      <div style="white-space:pre-wrap; background:#FEE2E2; padding:10px; border-radius:6px; font-size:13px; color:#991B1B;">${item.reject_reason}</div>
+    </div>`;
+  }
+
+  document.getElementById('approval-detail-content').innerHTML = detailHtml;
+
+  // Show approve/reject buttons only for the approver and if pending
+  let actionsHtml = '<button class="btn btn-secondary btn-sm" onclick="closeModal(\'approval-detail-modal\')">닫기</button>';
+  if (item.status === 'pending' && user && item.approver_id === user.id) {
+    actionsHtml += `
+      <div id="approval-reject-reason-wrap" style="display:none; flex:1; margin:0 8px;">
+        <textarea id="approval-reject-reason" placeholder="반려 사유를 입력하세요" rows="2" style="width:100%; resize:vertical;"></textarea>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="handleApproval('${item.id}', 'approved')">승인</button>
+      <button class="btn btn-sm" style="background:#DC2626; color:white; border:none;" onclick="showRejectReason('${item.id}')">반려</button>`;
+  }
+  document.getElementById('approval-detail-actions').innerHTML = actionsHtml;
+
+  openModal('approval-detail-modal');
+}
+
+function showRejectReason(approvalId) {
+  const wrap = document.getElementById('approval-reject-reason-wrap');
+  if (wrap) {
+    if (wrap.style.display === 'none') {
+      wrap.style.display = 'block';
+      // Replace the reject button to confirm
+      const rejectBtn = wrap.parentElement.querySelector('[style*="DC2626"]');
+      if (rejectBtn) {
+        rejectBtn.textContent = '반려 확인';
+        rejectBtn.onclick = function() {
+          const reason = document.getElementById('approval-reject-reason').value.trim();
+          if (!reason) { showToast('반려 사유를 입력해주세요.', 'error'); return; }
+          handleApproval(approvalId, 'rejected', reason);
+        };
+      }
+    }
+  }
 }
 
 // ---- Settlements ----
@@ -3864,7 +4044,20 @@ function getDefaultClients() {
     { id: 'cl_7', name: '코드엠아이엔씨(주)', bizNo: '333-81-00743', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '30%', feeBasis: '부가세수수료포함', dataDate: '익월5일', payDate: '익월말일', contactName: '이하늘 팀장', contactEmail: 'haneul@bifrostkr.com', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
     { id: 'cl_8', name: '주식회사 북극여우', bizNo: '384-81-01468', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '부가세수수료제외', dataDate: '익월10일', payDate: '익월말일', contactName: '박세민', contactEmail: 'psmin@polarfoxbook.com', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
     { id: 'cl_9', name: '디씨씨이엔티 주식회사', bizNo: '119-87-06686', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '부가세수수료제외', dataDate: '익월7일', payDate: '익월15일', contactName: '양희지 매니저', contactEmail: 'yangzi35@dcckor.com', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
-    { id: 'cl_10', name: '주식회사 블루픽', bizNo: '205-88-03575', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '수수료제외', dataDate: '익월15일', payDate: '익월말일', contactName: '이수빈 과장', contactEmail: 'book01@imageframe.kr', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' }
+    { id: 'cl_10', name: '주식회사 블루픽', bizNo: '205-88-03575', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '수수료제외', dataDate: '익월15일', payDate: '익월말일', contactName: '이수빈 과장', contactEmail: 'book01@imageframe.kr', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_11', name: '도서출판 청어람', bizNo: '130-90-37449', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '부가세수수료제외', dataDate: '익월10일', payDate: '익월말일', contactName: '박문수 실장', contactEmail: 'nadapms@naver.com', contactPhone: '010-7711-8012', taxEmail: '', orderEmail: '', memo: '공급율 65% 정산' },
+    { id: 'cl_12', name: '(주)학산문화사', bizNo: '106-81-54690', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '부가세수수료제외', dataDate: '익월7일', payDate: '익월말일', contactName: '', contactEmail: '', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_13', name: '투유드림', bizNo: '209-81-59897', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '부가세수수료제외', dataDate: '', payDate: '', contactName: '', contactEmail: '', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_14', name: '리디 주식회사', bizNo: '120-87-27435', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25% (VAT포함)', feeBasis: '부가세수수료포함', dataDate: '익월5일', payDate: '계산서 발행 후 20일', contactName: '최가은 매니저', contactEmail: 'lead.gaeun.choi@ridi.com', contactPhone: '', taxEmail: '', orderEmail: '', memo: '국내 판매 한정' },
+    { id: 'cl_15', name: '와이랩', bizNo: '', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '부가세수수료제외', dataDate: '', payDate: '', contactName: '', contactEmail: '', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_16', name: '락킨코리아', bizNo: '', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '부가세수수료제외', dataDate: '', payDate: '', contactName: '', contactEmail: '', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_17', name: '네이버웹툰 유한회사', bizNo: '669-86-01888', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25% (VAT포함)', feeBasis: '부가세수수료포함', dataDate: '익월5일', payDate: '익월말일', contactName: '최은원', contactEmail: 'eunwon.choi@webtoonscorp.com', contactPhone: '010-6206-7082', taxEmail: '', orderEmail: '', memo: '3개월 단위 자동연장, 매월 25일까지 발주서 이메일' },
+    { id: 'cl_18', name: '주식회사 에이템포미디어', bizNo: '752-86-01268', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '25%', feeBasis: '부가세수수료제외', dataDate: '', payDate: '', contactName: '', contactEmail: '', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_19', name: '태양네트웍스', bizNo: '', bank: '', contractDate: '', contractPeriod: '', status: '협의중', feeRate: '27% (VAT포함)', feeBasis: '부가세수수료포함', dataDate: '익월5일', payDate: '익월말일', contactName: '', contactEmail: '', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_20', name: '맥 에이전시', bizNo: '', bank: '', contractDate: '', contractPeriod: '', status: '협의중', feeRate: '', feeBasis: '', dataDate: '', payDate: '', contactName: '', contactEmail: '', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_21', name: '투니크', bizNo: '', bank: '', contractDate: '', contractPeriod: '', status: '협의중', feeRate: '', feeBasis: '', dataDate: '', payDate: '', contactName: '', contactEmail: '', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' },
+    { id: 'cl_22', name: '바이프로스트', bizNo: '', bank: '', contractDate: '', contractPeriod: '', status: '계약완료', feeRate: '30%', feeBasis: '부가세수수료포함', dataDate: '익월5일', payDate: '익월말일', contactName: '이하늘 팀장', contactEmail: 'haneul@bifrostkr.com', contactPhone: '010-6762-7110', taxEmail: '', orderEmail: '', memo: '코드엠 계약법인, 입고확인서 3일이내' },
+    { id: 'cl_23', name: '북새통', bizNo: '', bank: '', contractDate: '', contractPeriod: '', status: '협의중', feeRate: '', feeBasis: '', dataDate: '', payDate: '', contactName: '박회탁 대표', contactEmail: '', contactPhone: '', taxEmail: '', orderEmail: '', memo: '' }
   ];
 }
 
