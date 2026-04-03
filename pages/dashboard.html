@@ -164,50 +164,135 @@
         </div>
       </div>
 
-      <!-- ===== ATTENDANCE ===== -->
+      <!-- ===== ATTENDANCE (매장 맞춤) ===== -->
       <div id="section-attendance" class="page-section" style="display:none;">
         <div class="page-header">
           <div>
             <h1>출퇴근</h1>
-            <div class="header-sub">출근/퇴근 기록 및 근태 관리</div>
+            <div class="header-sub">매장/사무실 근무 기록 및 휴게시간 관리</div>
           </div>
         </div>
         <div class="page-body">
+
+          <!-- 출퇴근 + 휴게시간 -->
           <div class="card" style="margin-bottom:24px;">
             <div class="card-body">
               <div class="attendance-clock">
                 <div class="time-display" id="current-time">--:--:--</div>
                 <div class="date-display" id="current-date"></div>
-                <div class="attendance-buttons">
+
+                <!-- 오늘 상태 표시 -->
+                <div id="today-status-detail" style="margin:20px auto; max-width:500px; text-align:left; display:none;">
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div style="background:var(--gray-50); padding:12px 16px; border-radius:8px;">
+                      <div style="font-size:11px; color:var(--gray-500); font-weight:600;">출근</div>
+                      <div id="today-clock-in" style="font-size:18px; font-weight:700;">-</div>
+                    </div>
+                    <div style="background:var(--gray-50); padding:12px 16px; border-radius:8px;">
+                      <div style="font-size:11px; color:var(--gray-500); font-weight:600;">퇴근</div>
+                      <div id="today-clock-out" style="font-size:18px; font-weight:700;">-</div>
+                    </div>
+                    <div style="background:var(--yellow-bg); padding:12px 16px; border-radius:8px;">
+                      <div style="font-size:11px; color:var(--gray-500); font-weight:600;">휴게시간</div>
+                      <div id="today-break" style="font-size:18px; font-weight:700;">-</div>
+                    </div>
+                    <div style="background:var(--green-bg); padding:12px 16px; border-radius:8px;">
+                      <div style="font-size:11px; color:var(--gray-500); font-weight:600;">실 근무시간</div>
+                      <div id="today-work-hours" style="font-size:18px; font-weight:700; color:var(--green);">-</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="attendance-buttons" style="flex-wrap:wrap;">
                   <button class="btn-clock-in" id="btn-clock-in" onclick="clockIn()">출근하기</button>
+                  <button class="btn-clock-out" id="btn-break-start" onclick="breakStart()" disabled style="background:var(--yellow); color:var(--black);">휴게 시작</button>
+                  <button class="btn-clock-out" id="btn-break-end" onclick="breakEnd()" disabled style="background:#FF9500; color:white;">휴게 종료</button>
                   <button class="btn-clock-out" id="btn-clock-out" onclick="clockOut()" disabled>퇴근하기</button>
                 </div>
                 <div class="attendance-status" id="attendance-status"></div>
+
+                <!-- 수요일 휴무 안내 -->
+                <div id="wednesday-notice" style="display:none; margin-top:20px; padding:16px; background:var(--red-bg); border-radius:10px; color:var(--red); font-weight:600;">
+                  오늘은 매장 정기 휴무일(수요일)입니다
+                </div>
               </div>
             </div>
           </div>
 
+          <!-- 이번 달 근무 요약 -->
+          <div class="stats-grid" style="margin-bottom:24px;">
+            <div class="stat-card">
+              <div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+              <div class="stat-value" id="month-work-days">-</div>
+              <div class="stat-label">이번 달 근무일수</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+              <div class="stat-value" id="month-work-hours">-</div>
+              <div class="stat-label">이번 달 총 근무시간</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></div>
+              <div class="stat-value" id="month-break-hours">-</div>
+              <div class="stat-label">이번 달 총 휴게시간</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+              <div class="stat-value" id="month-off-days">-</div>
+              <div class="stat-label">휴무일</div>
+            </div>
+          </div>
+
+          <!-- 근태 기록 테이블 -->
           <div class="card">
             <div class="card-header">
               <h3>근태 기록</h3>
+              <select id="attendance-month-filter" onchange="loadAttendanceHistory()" style="padding:6px 12px; border:1px solid var(--gray-200); border-radius:6px; font-family:inherit; font-size:13px;">
+              </select>
             </div>
             <div class="table-container">
               <table>
                 <thead>
                   <tr>
                     <th>날짜</th>
+                    <th>요일</th>
                     <th>출근</th>
                     <th>퇴근</th>
-                    <th>근무시간</th>
+                    <th>휴게시간</th>
+                    <th>실 근무</th>
                     <th>상태</th>
                   </tr>
                 </thead>
                 <tbody id="attendance-history">
-                  <tr><td colspan="5" class="empty-state">기록이 없습니다.</td></tr>
+                  <tr><td colspan="7" class="empty-state">기록이 없습니다.</td></tr>
                 </tbody>
               </table>
             </div>
           </div>
+
+          <!-- 팀 현황 (관리자용) -->
+          <div class="card" style="margin-top:24px;">
+            <div class="card-header">
+              <h3>오늘 팀 현황</h3>
+            </div>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>이름</th>
+                    <th>부서</th>
+                    <th>출근</th>
+                    <th>현재 상태</th>
+                    <th>근무시간</th>
+                  </tr>
+                </thead>
+                <tbody id="team-attendance-today">
+                  <tr><td colspan="5" class="empty-state">오늘 출근 기록이 없습니다.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       </div>
 

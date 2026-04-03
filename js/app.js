@@ -47,141 +47,140 @@ function updateClock() {
   }
 }
 
-// ---- Attendance ----
+// ---- Attendance (매장 맞춤: 출근→휴게시작→휴게종료→퇴근) ----
 async function clockIn() {
   const user = await getCurrentUser();
   if (!user) return;
-
   const today = new Date().toISOString().split('T')[0];
 
-  // Check if already clocked in today
-  const { data: existing } = await sb
-    .from('attendance')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('date', today)
-    .single();
+  const { data: existing } = await sb.from('attendance').select('*').eq('user_id', user.id).eq('date', today).single();
+  if (existing && existing.clock_in) { showToast('이미 출근 처리되었습니다.', 'error'); return; }
 
-  if (existing && existing.clock_in) {
-    showToast('이미 출근 처리되었습니다.', 'error');
-    return;
-  }
-
-  const now = new Date().toISOString();
-
-  const { error } = await sb.from('attendance').upsert({
-    user_id: user.id,
-    date: today,
-    clock_in: now,
-    status: 'working'
-  });
-
-  if (error) {
-    showToast('출근 처리 실패: ' + error.message, 'error');
-    return;
-  }
-
+  const { error } = await sb.from('attendance').upsert({ user_id: user.id, date: today, clock_in: new Date().toISOString(), status: 'working' });
+  if (error) { showToast('출근 실패: ' + error.message, 'error'); return; }
   showToast('출근 완료!', 'success');
+  updateAttendanceUI();
+}
+
+async function breakStart() {
+  const user = await getCurrentUser();
+  if (!user) return;
+  const today = new Date().toISOString().split('T')[0];
+
+  const { data } = await sb.from('attendance').select('*').eq('user_id', user.id).eq('date', today).single();
+  if (!data || !data.clock_in) { showToast('먼저 출근하세요.', 'error'); return; }
+  if (data.break_start && !data.break_end) { showToast('이미 휴게 중입니다.', 'error'); return; }
+
+  const { error } = await sb.from('attendance').update({ break_start: new Date().toISOString(), status: 'break' }).eq('id', data.id);
+  if (error) { showToast('휴게 시작 실패: ' + error.message, 'error'); return; }
+  showToast('휴게시간 시작!', 'info');
+  updateAttendanceUI();
+}
+
+async function breakEnd() {
+  const user = await getCurrentUser();
+  if (!user) return;
+  const today = new Date().toISOString().split('T')[0];
+
+  const { data } = await sb.from('attendance').select('*').eq('user_id', user.id).eq('date', today).single();
+  if (!data || !data.break_start) { showToast('휴게 시작을 먼저 하세요.', 'error'); return; }
+
+  const breakMins = Math.round((new Date() - new Date(data.break_start)) / 60000);
+  const { error } = await sb.from('attendance').update({ break_end: new Date().toISOString(), break_minutes: breakMins, status: 'working' }).eq('id', data.id);
+  if (error) { showToast('휴게 종료 실패: ' + error.message, 'error'); return; }
+  showToast('휴게 종료! (' + breakMins + '분)', 'success');
   updateAttendanceUI();
 }
 
 async function clockOut() {
   const user = await getCurrentUser();
   if (!user) return;
-
   const today = new Date().toISOString().split('T')[0];
 
-  const { data: existing } = await sb
-    .from('attendance')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('date', today)
-    .single();
+  const { data: existing } = await sb.from('attendance').select('*').eq('user_id', user.id).eq('date', today).single();
+  if (!existing || !existing.clock_in) { showToast('먼저 출근하세요.', 'error'); return; }
+  if (existing.clock_out) { showToast('이미 퇴근했습니다.', 'error'); return; }
 
-  if (!existing || !existing.clock_in) {
-    showToast('먼저 출근 처리를 해주세요.', 'error');
-    return;
-  }
+  const now = new Date();
+  const totalMins = (now - new Date(existing.clock_in)) / 60000;
+  const breakMins = existing.break_minutes || 0;
+  const workMins = totalMins - breakMins;
+  const workHours = (workMins / 60).toFixed(1);
 
-  if (existing.clock_out) {
-    showToast('이미 퇴근 처리되었습니다.', 'error');
-    return;
-  }
+  const { error } = await sb.from('attendance').update({
+    clock_out: now.toISOString(),
+    work_hours: parseFloat(workHours),
+    status: 'done'
+  }).eq('id', existing.id);
 
-  const now = new Date().toISOString();
-
-  // Calculate work hours
-  const clockInTime = new Date(existing.clock_in);
-  const clockOutTime = new Date(now);
-  const workHours = ((clockOutTime - clockInTime) / (1000 * 60 * 60)).toFixed(1);
-
-  const { error } = await sb
-    .from('attendance')
-    .update({
-      clock_out: now,
-      work_hours: parseFloat(workHours),
-      status: 'done'
-    })
-    .eq('id', existing.id);
-
-  if (error) {
-    showToast('퇴근 처리 실패: ' + error.message, 'error');
-    return;
-  }
-
-  showToast('퇴근 완료!', 'success');
+  if (error) { showToast('퇴근 실패: ' + error.message, 'error'); return; }
+  showToast('퇴근 완료! 실근무: ' + workHours + '시간', 'success');
   updateAttendanceUI();
 }
 
 async function updateAttendanceUI() {
   const user = await getCurrentUser();
   if (!user) return;
-
   const today = new Date().toISOString().split('T')[0];
 
-  const { data } = await sb
-    .from('attendance')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('date', today)
-    .single();
+  const { data } = await sb.from('attendance').select('*').eq('user_id', user.id).eq('date', today).single();
 
   const btnIn = document.getElementById('btn-clock-in');
   const btnOut = document.getElementById('btn-clock-out');
+  const btnBreakStart = document.getElementById('btn-break-start');
+  const btnBreakEnd = document.getElementById('btn-break-end');
   const statusEl = document.getElementById('attendance-status');
+  const detailEl = document.getElementById('today-status-detail');
 
   if (!btnIn) return;
 
-  const canSeeTime = isManager(user);
+  // 수요일 휴무 체크
+  const dayOfWeek = new Date().getDay();
+  const wedNotice = document.getElementById('wednesday-notice');
+  if (wedNotice) wedNotice.style.display = (dayOfWeek === 3) ? 'block' : 'none';
 
-  if (data && data.clock_in && !data.clock_out) {
-    btnIn.disabled = true;
-    btnOut.disabled = false;
-    if (statusEl) {
-      if (canSeeTime) {
-        const clockInTime = new Date(data.clock_in).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-        statusEl.innerHTML = `<span class="status-badge working">근무중</span> 출근시간: ${clockInTime}`;
-      } else {
-        statusEl.innerHTML = `<span class="status-badge working">근무중</span>`;
-      }
-    }
-  } else if (data && data.clock_out) {
-    btnIn.disabled = true;
-    btnOut.disabled = true;
-    if (statusEl) {
-      if (canSeeTime) {
-        statusEl.innerHTML = `<span class="status-badge done">퇴근완료</span> 근무시간: ${data.work_hours}시간`;
-      } else {
-        statusEl.innerHTML = `<span class="status-badge done">퇴근완료</span>`;
-      }
-    }
-  } else {
+  // 버튼 초기화
+  btnIn.disabled = true; btnOut.disabled = true;
+  if (btnBreakStart) btnBreakStart.disabled = true;
+  if (btnBreakEnd) btnBreakEnd.disabled = true;
+
+  const fmt = (iso) => iso ? new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
+
+  if (!data || !data.clock_in) {
+    // 미출근
     btnIn.disabled = false;
-    btnOut.disabled = true;
-    if (statusEl) {
-      statusEl.innerHTML = `<span class="status-badge off">미출근</span>`;
-    }
+    if (statusEl) statusEl.innerHTML = '<span class="status-badge off">미출근</span>';
+    if (detailEl) detailEl.style.display = 'none';
+  } else if (data.status === 'break') {
+    // 휴게중
+    if (btnBreakEnd) btnBreakEnd.disabled = false;
+    if (statusEl) statusEl.innerHTML = '<span class="status-badge" style="background:var(--yellow-bg); color:#B8860B;">휴게중</span>';
+    showTodayDetail(data);
+  } else if (!data.clock_out) {
+    // 근무중
+    btnOut.disabled = false;
+    if (btnBreakStart) btnBreakStart.disabled = !!(data.break_start && data.break_end); // 휴게 이미 했으면 비활성
+    if (!data.break_start && btnBreakStart) btnBreakStart.disabled = false;
+    if (statusEl) statusEl.innerHTML = '<span class="status-badge working">근무중</span>';
+    showTodayDetail(data);
+  } else {
+    // 퇴근완료
+    if (statusEl) statusEl.innerHTML = '<span class="status-badge done">퇴근완료</span>';
+    showTodayDetail(data);
   }
+}
+
+function showTodayDetail(data) {
+  const detailEl = document.getElementById('today-status-detail');
+  if (!detailEl) return;
+  detailEl.style.display = 'block';
+
+  const fmt = (iso) => iso ? new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
+
+  document.getElementById('today-clock-in').textContent = fmt(data.clock_in);
+  document.getElementById('today-clock-out').textContent = fmt(data.clock_out);
+  document.getElementById('today-break').textContent = data.break_minutes ? data.break_minutes + '분' : '-';
+  document.getElementById('today-work-hours').textContent = data.work_hours ? data.work_hours + '시간' : '근무중...';
 }
 
 // ---- Attendance History ----
