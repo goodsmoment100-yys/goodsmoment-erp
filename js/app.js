@@ -1757,6 +1757,7 @@ function getResourceStore() {
 
   // Default entries
   const defaults = [
+    { title: '📁 굿즈모먼트 공유 드라이브', category: '경영자료', url: 'https://drive.google.com/drive/folders/1n0H2NgUChqCuPI-GtPGfuN1UIjRh1N3u?usp=sharing', memo: '전체 경영자료 구글 드라이브', date: '2026-04-05' },
     { title: '회의록 양식', category: '양식', url: '', memo: '', date: '2026-04-01' },
     { title: '연차사용현황', category: '양식', url: '', memo: '', date: '2026-04-01' },
     { title: '입고확인증', category: '양식', url: '', memo: '', date: '2026-04-01' },
