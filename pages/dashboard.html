@@ -772,6 +772,8 @@
                 <input type="file" id="inv-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleInventoryUpload(this.files[0])">
                 <span id="inv-upload-status" style="font-size:13px; color:var(--gray-500); align-self:center;"></span>
               </div>
+              <!-- 제작사별 요약 -->
+              <div id="inv-publisher-summary" style="padding:0 20px; margin-bottom:16px;"></div>
               <div style="padding:0 20px;">
                 <input type="text" id="inv-search" placeholder="상품명 또는 제작사 검색..." oninput="filterInventory()" style="width:100%; padding:10px; border:1px solid var(--gray-200); border-radius:8px; margin-bottom:12px; font-family:inherit; font-size:14px; box-sizing:border-box;">
               </div>

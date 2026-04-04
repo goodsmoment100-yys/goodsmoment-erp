@@ -3814,6 +3814,41 @@ function renderInventoryStock() {
       moreWrap.style.display = 'none';
     }
   }
+
+  // 제작사별 요약 렌더링
+  renderPublisherSummaryCards(items);
+}
+
+function renderPublisherSummaryCards(items) {
+  var container = document.getElementById('inv-publisher-summary');
+  if (!container) return;
+
+  var byPublisher = {};
+  items.forEach(function(item) {
+    var pub = item.publisher || '미분류';
+    if (!byPublisher[pub]) byPublisher[pub] = { total: 0, outOfStock: 0, low: 0, items: 0 };
+    byPublisher[pub].items++;
+    byPublisher[pub].total += (item.currentStock || 0);
+    if ((item.currentStock || 0) <= 0) byPublisher[pub].outOfStock++;
+    else if ((item.currentStock || 0) < (item.minStock || 5)) byPublisher[pub].low++;
+  });
+
+  var publishers = Object.entries(byPublisher).sort(function(a, b) { return b[1].total - a[1].total; });
+
+  if (publishers.length === 0) { container.innerHTML = ''; return; }
+
+  container.innerHTML = '<div style="font-size:12px; font-weight:600; color:var(--gray-500); margin-bottom:8px;">제작사별 재고 요약</div>' +
+    '<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:8px;">' +
+    publishers.map(function(entry) {
+      var name = entry[0], data = entry[1];
+      var borderColor = data.outOfStock > 0 ? 'var(--red)' : data.low > 0 ? '#B8860B' : 'var(--primary)';
+      return '<div style="background:var(--gray-50); padding:10px; border-radius:8px; border-left:3px solid ' + borderColor + '; cursor:pointer;" onclick="document.getElementById(\'inv-search\').value=\'' + name + '\'; filterInventory();">' +
+        '<div style="font-size:12px; font-weight:700; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + name + '</div>' +
+        '<div style="font-size:11px; color:var(--gray-500);">' + data.items + '종 / 재고 ' + data.total + '개</div>' +
+        (data.outOfStock > 0 ? '<div style="font-size:11px; color:var(--red); font-weight:600;">품절 ' + data.outOfStock + '종</div>' : '') +
+        (data.low > 0 ? '<div style="font-size:11px; color:#B8860B; font-weight:600;">부족 ' + data.low + '종</div>' : '') +
+      '</div>';
+    }).join('') + '</div>';
 }
 
 function showMoreInventory() {
