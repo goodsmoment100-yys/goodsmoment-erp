@@ -725,6 +725,7 @@ function navigateTo(page) {
   switch(page) {
     case 'dashboard': if (typeof loadDashboard === 'function') loadDashboard(); else loadDashboardStats(); break;
     case 'attendance': updateAttendanceUI(); loadAttendanceHistory(); break;
+    case 'closing': loadClosing(); break;
     case 'approval': loadApprovals(); break;
     case 'settlement': loadSettlements(); break;
     case 'notice': loadNotices(); break;
@@ -4741,4 +4742,83 @@ function deleteClient() {
   closeModal('client-modal');
   renderClientList();
   showToast('거래처가 삭제되었습니다.', 'success');
+}
+
+// === CLOSING (마감정산) ===
+function loadClosing() {
+  const today = new Date();
+  const dateStr = (today.getMonth()+1) + '/' + today.getDate() + ' 마감정산';
+  const title = document.getElementById('closing-date-title');
+  if (title) title.textContent = dateStr;
+  const history = getClosingHistory();
+  const todayKey = today.toISOString().split('T')[0];
+  const todayEntry = history.find(h => h.date === todayKey);
+  if (todayEntry) {
+    document.getElementById('closing-1f').value = todayEntry.f1;
+    document.getElementById('closing-2f').value = todayEntry.f2;
+    document.getElementById('closing-3f').value = todayEntry.f3;
+    document.getElementById('closing-4f').value = todayEntry.f4 || 0;
+    calcClosingTotal();
+  }
+  renderClosingHistory();
+}
+function calcClosingTotal() {
+  const f1 = parseInt(document.getElementById('closing-1f')?.value) || 0;
+  const f2 = parseInt(document.getElementById('closing-2f')?.value) || 0;
+  const f3 = parseInt(document.getElementById('closing-3f')?.value) || 0;
+  const f4 = parseInt(document.getElementById('closing-4f')?.value) || 0;
+  const el = document.getElementById('closing-total');
+  if (el) el.textContent = '₩' + (f1+f2+f3+f4).toLocaleString();
+}
+function getClosingHistory() {
+  const data = localStorage.getItem('gm_closing');
+  if (data) return JSON.parse(data);
+  const defaults = [
+    {date:'2026-04-04',f1:361500,f2:29100,f3:342000,f4:0,total:732600,reporter:'이슬',memo:''},
+    {date:'2026-04-03',f1:415200,f2:52300,f3:287600,f4:0,total:755100,reporter:'이슬',memo:'2층 디피 변경'},
+    {date:'2026-04-02',f1:289000,f2:31500,f3:195000,f4:0,total:515500,reporter:'김형희',memo:''},
+    {date:'2026-04-01',f1:523400,f2:67800,f3:412300,f4:0,total:1003500,reporter:'이슬',memo:'월초 고객 많음'}
+  ];
+  localStorage.setItem('gm_closing', JSON.stringify(defaults));
+  return defaults;
+}
+function submitClosing() {
+  const f1 = parseInt(document.getElementById('closing-1f')?.value) || 0;
+  const f2 = parseInt(document.getElementById('closing-2f')?.value) || 0;
+  const f3 = parseInt(document.getElementById('closing-3f')?.value) || 0;
+  const f4 = parseInt(document.getElementById('closing-4f')?.value) || 0;
+  const total = f1+f2+f3+f4;
+  const memo = document.getElementById('closing-memo')?.value || '';
+  if (total === 0) { showToast('매출 금액을 입력해주세요','error'); return; }
+  const today = new Date().toISOString().split('T')[0];
+  const history = getClosingHistory();
+  const userName = currentUser?.user_metadata?.name || currentProfile?.name || '미정';
+  const existingIdx = history.findIndex(h => h.date === today);
+  const entry = {date:today,f1,f2,f3,f4,total,reporter:userName,memo,submittedAt:new Date().toISOString()};
+  if (existingIdx >= 0) { history[existingIdx] = entry; showToast('마감정산 수정 완료!','success'); }
+  else { history.unshift(entry); showToast('마감정산 제출 완료!','success'); }
+  localStorage.setItem('gm_closing', JSON.stringify(history));
+  const msgStore = JSON.parse(localStorage.getItem('gm_messages') || '[]');
+  msgStore.unshift({id:'msg_closing_'+Date.now(),from:currentUser?.id||'system',fromName:userName,to:'all',toName:'전체',content:'[마감정산] '+today.replace(/-/g,'.')+'\n1F = ₩'+f1.toLocaleString()+'\n2F = ₩'+f2.toLocaleString()+'\n3F = ₩'+f3.toLocaleString()+(f4>0?'\n4F = ₩'+f4.toLocaleString():'')+'\n합계 = ₩'+total.toLocaleString()+(memo?'\n메모: '+memo:''),createdAt:new Date().toISOString()});
+  localStorage.setItem('gm_messages', JSON.stringify(msgStore));
+  renderClosingHistory();
+}
+function renderClosingHistory() {
+  const tbody = document.getElementById('closing-history-table');
+  if (!tbody) return;
+  const history = getClosingHistory();
+  if (history.length === 0) { tbody.innerHTML = '<tr><td colspan="8" class="empty-state">마감정산 내역이 없습니다.</td></tr>'; return; }
+  tbody.innerHTML = history.slice(0,30).map(h => '<tr><td style="font-weight:600; white-space:nowrap;">'+h.date+'</td><td style="text-align:right;">₩'+(h.f1||0).toLocaleString()+'</td><td style="text-align:right;">₩'+(h.f2||0).toLocaleString()+'</td><td style="text-align:right;">₩'+(h.f3||0).toLocaleString()+'</td><td style="text-align:right;">₩'+(h.f4||0).toLocaleString()+'</td><td style="text-align:right; font-weight:700; color:var(--primary);">₩'+(h.total||0).toLocaleString()+'</td><td>'+(h.reporter||'-')+'</td><td style="font-size:12px; color:var(--gray-500); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'+(h.memo||'-')+'</td></tr>').join('');
+}
+function downloadClosingExcel() {
+  const history = getClosingHistory();
+  if (history.length === 0) { showToast('데이터가 없습니다','error'); return; }
+  const wb = XLSX.utils.book_new();
+  const header = ['날짜','1F','2F','3F','4F','합계','보고자','메모'];
+  const rows = history.map(h => [h.date,h.f1||0,h.f2||0,h.f3||0,h.f4||0,h.total||0,h.reporter||'',h.memo||'']);
+  const ws = XLSX.utils.aoa_to_sheet([header,...rows]);
+  ws['!cols'] = [{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:14},{wch:8},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, ws, '마감정산');
+  XLSX.writeFile(wb, '굿즈모먼트_마감정산_'+new Date().toISOString().split('T')[0].replace(/-/g,'')+'.xlsx');
+  showToast('마감정산 엑셀 다운로드 완료','success');
 }

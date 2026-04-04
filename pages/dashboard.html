@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GOODS MOMENT - Dashboard</title>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <meta name="theme-color" content="#2EC4B6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="굿즈모먼트">
+  <link rel="apple-touch-icon" href="../logo_mint.png">
 </head>
 <body>
   <div id="toast-container" class="toast-container"></div>
@@ -32,6 +38,10 @@
           <a class="nav-item" data-page="attendance" onclick="navigateTo('attendance')">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             출퇴근
+          </a>
+          <a class="nav-item" data-page="closing" onclick="navigateTo('closing')">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            마감정산
           </a>
           <a class="nav-item" data-page="schedule" onclick="navigateTo('schedule')">
             <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -2846,3 +2856,33 @@
   </script>
 </body>
 </html>
+
+<!-- CLOSING SECTION - injected -->
+<div id="section-closing" class="page-section" style="display:none;">
+  <div class="page-header"><div><h1>마감정산</h1><div class="header-sub">일일 매출 보고</div></div></div>
+  <div class="page-body">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header"><h3 id="closing-date-title">오늘 마감정산</h3></div>
+      <div class="card-body">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+          <div class="form-group"><label>1층</label><input type="number" id="closing-1f" placeholder="0" oninput="calcClosingTotal()" style="font-size:18px; font-weight:700; text-align:right;"></div>
+          <div class="form-group"><label>2층</label><input type="number" id="closing-2f" placeholder="0" oninput="calcClosingTotal()" style="font-size:18px; font-weight:700; text-align:right;"></div>
+          <div class="form-group"><label>3층</label><input type="number" id="closing-3f" placeholder="0" oninput="calcClosingTotal()" style="font-size:18px; font-weight:700; text-align:right;"></div>
+          <div class="form-group"><label>4층 (팝업)</label><input type="number" id="closing-4f" placeholder="0" oninput="calcClosingTotal()" style="font-size:18px; font-weight:700; text-align:right;"></div>
+        </div>
+        <div style="background:var(--gray-50); padding:16px; border-radius:10px; display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <span style="font-size:14px; font-weight:600; color:var(--gray-600);">합계</span>
+          <span style="font-size:28px; font-weight:800; color:var(--primary);" id="closing-total">₩0</span>
+        </div>
+        <div class="form-group" style="margin-bottom:16px;"><label>메모 (특이사항)</label><textarea id="closing-memo" rows="2" placeholder="특이사항이 있으면 입력하세요" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit; resize:none;"></textarea></div>
+        <button class="btn btn-primary" onclick="submitClosing()" style="width:100%; padding:14px; font-size:16px;">마감정산 제출</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>최근 마감정산 내역</h3><button class="btn btn-secondary btn-sm" onclick="downloadClosingExcel()">엑셀 다운로드</button></div>
+      <div class="table-container">
+        <table><thead><tr><th>날짜</th><th>1F</th><th>2F</th><th>3F</th><th>4F</th><th>합계</th><th>보고자</th><th>메모</th></tr></thead><tbody id="closing-history-table"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
