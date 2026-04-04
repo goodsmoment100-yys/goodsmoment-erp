@@ -421,20 +421,25 @@ async function createApproval(type, title, content, extras = {}) {
     approverId = admins && admins.length > 0 ? admins[0].id : user.id;
   }
 
+  // DB type은 leave/expense/report/other만 허용 → 매핑
+  const typeMap = { leave: 'leave', vacation: 'leave', expense: 'expense', purchase: 'expense', report: 'report', other: 'other' };
+  const dbType = typeMap[type] || 'other';
+
+  // 추가 정보를 content에 합치기
+  let fullContent = content || '';
+  if (extras.start_date || extras.end_date) fullContent += '\n[기간] ' + (extras.start_date || '') + ' ~ ' + (extras.end_date || '');
+  if (extras.amount) fullContent += '\n[금액] ₩' + parseInt(extras.amount).toLocaleString();
+  if (extras.attachment_memo) fullContent += '\n[첨부메모] ' + extras.attachment_memo;
+  fullContent += '\n[원본타입] ' + type;
+
   const insertData = {
     requester_id: user.id,
     approver_id: approverId,
-    type,
+    type: dbType,
     title,
-    content,
+    content: fullContent,
     status: 'pending'
   };
-
-  // Add optional fields if supported by the DB
-  if (extras.start_date) insertData.start_date = extras.start_date;
-  if (extras.end_date) insertData.end_date = extras.end_date;
-  if (extras.amount) insertData.amount = extras.amount;
-  if (extras.attachment_memo) insertData.attachment_memo = extras.attachment_memo;
 
   const { error } = await sb.from('approvals').insert(insertData);
 
