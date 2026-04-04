@@ -417,6 +417,7 @@
           <div class="tabs" style="margin-bottom:16px; display:flex; gap:0; border-bottom:2px solid var(--gray-200);">
             <div class="tab-item active" onclick="switchSettleTab('publisher')" id="settle-tab-btn-publisher" style="padding:10px 20px; font-weight:600; font-size:14px; cursor:pointer; border-bottom:2px solid var(--primary); margin-bottom:-2px; color:var(--primary);">제작사 정산</div>
             <div class="tab-item" onclick="switchSettleTab('urban')" id="settle-tab-btn-urban" style="padding:10px 20px; font-weight:600; font-size:14px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; color:var(--gray-500);">어반플레이 정산</div>
+            <div class="tab-item" onclick="switchSettleTab('popup')" id="settle-tab-btn-popup" style="padding:10px 20px; font-weight:600; font-size:14px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; color:var(--gray-500);">팝업 정산</div>
           </div>
 
           <div id="settle-tab-publisher">
@@ -646,6 +647,83 @@
               </div>
             </div>
           </div><!-- /settle-tab-urban -->
+
+          <!-- Popup Settlement Tab -->
+          <div id="settle-tab-popup" style="display:none;">
+            <div class="card">
+              <div class="card-header">
+                <h3>팝업 프로젝트별 정산</h3>
+              </div>
+              <div class="card-body">
+                <!-- Project selector -->
+                <div class="form-group" style="max-width:300px; margin-bottom:20px;">
+                  <label>프로젝트 선택</label>
+                  <select id="popup-settle-project" onchange="loadPopupSettlement()" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                    <option value="">프로젝트를 선택하세요</option>
+                  </select>
+                </div>
+
+                <div id="popup-settle-content" style="display:none;">
+                  <!-- Revenue -->
+                  <div style="background:var(--green-bg); border-radius:10px; padding:16px 20px; margin-bottom:16px;">
+                    <div style="font-size:13px; font-weight:700; color:var(--green); margin-bottom:12px;">실제 매출</div>
+                    <div class="form-group">
+                      <label style="font-size:12px;">팝업 매출액</label>
+                      <input type="number" id="popup-actual-revenue" placeholder="0" oninput="calculatePopupSettlement()" style="width:100%; padding:8px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+                      <div style="font-size:11px; color:var(--gray-400); margin-top:4px;">※ 이지포스에서 해당 기간 매출 확인 후 입력</div>
+                    </div>
+                  </div>
+
+                  <!-- Costs from project -->
+                  <div style="background:var(--red-bg); border-radius:10px; padding:16px 20px; margin-bottom:16px;">
+                    <div style="font-size:13px; font-weight:700; color:var(--red); margin-bottom:12px;">비용 (프로젝트에서 가져옴)</div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                      <div>
+                        <div style="font-size:12px; color:var(--gray-500);">인테리어/디자인</div>
+                        <div style="font-size:16px; font-weight:700;" id="popup-cost-interior">₩0</div>
+                      </div>
+                      <div>
+                        <div style="font-size:12px; color:var(--gray-500);">굿즈 제작</div>
+                        <div style="font-size:16px; font-weight:700;" id="popup-cost-production">₩0</div>
+                      </div>
+                      <div>
+                        <div style="font-size:12px; color:var(--gray-500);">증정 굿즈</div>
+                        <div style="font-size:16px; font-weight:700;" id="popup-cost-giveaway">₩0</div>
+                      </div>
+                      <div>
+                        <div style="font-size:12px; color:var(--gray-500);">알바 인건비 (예상)</div>
+                        <div style="font-size:16px; font-weight:700;" id="popup-cost-labor">₩0</div>
+                      </div>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end; margin-top:12px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08);">
+                      <span style="font-size:13px; color:var(--gray-600);">비용 합계: </span>
+                      <span style="font-size:16px; font-weight:800; color:var(--red); margin-left:8px;" id="popup-cost-total">₩0</span>
+                    </div>
+                  </div>
+
+                  <!-- Result -->
+                  <div style="background:var(--gray-50); border-radius:10px; padding:16px 20px; margin-bottom:16px;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; text-align:center;">
+                      <div>
+                        <div style="font-size:12px; color:var(--gray-500);">매출</div>
+                        <div style="font-size:20px; font-weight:800; color:var(--green);" id="popup-result-revenue">₩0</div>
+                      </div>
+                      <div>
+                        <div style="font-size:12px; color:var(--gray-500);">비용</div>
+                        <div style="font-size:20px; font-weight:800; color:var(--red);" id="popup-result-cost">₩0</div>
+                      </div>
+                      <div>
+                        <div style="font-size:12px; color:var(--gray-500);">순익</div>
+                        <div style="font-size:20px; font-weight:800; color:var(--primary);" id="popup-result-profit">₩0</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button class="btn btn-primary" onclick="downloadPopupSettlement()" style="width:100%;">팝업 정산서 다운로드 (Excel)</button>
+                </div>
+              </div>
+            </div>
+          </div><!-- /settle-tab-popup -->
 
         </div>
       </div>
@@ -1148,8 +1226,8 @@
               <div class="stat-icon blue">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
               </div>
-              <div class="stat-value" id="proj-stat-revenue">0원</div>
-              <div class="stat-label">이번 달 프로젝트 매출</div>
+              <div class="stat-value" id="proj-stat-budget">0원</div>
+              <div class="stat-label">진행중 계획 비용</div>
             </div>
             <div class="stat-card">
               <div class="stat-icon yellow">
@@ -1908,13 +1986,16 @@
 
   <!-- Project Modal -->
   <div class="modal-overlay" id="project-modal">
-    <div class="modal" style="max-width:560px;">
+    <div class="modal" style="max-width:640px; max-height:90vh; overflow-y:auto;">
       <div class="modal-header">
         <h3 id="project-modal-title">프로젝트 생성</h3>
         <button class="modal-close" onclick="closeModal('project-modal')">&times;</button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="project-edit-id">
+
+        <!-- 기본 정보 -->
+        <div style="font-size:12px; font-weight:700; color:var(--gray-500); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">기본 정보</div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
           <div class="form-group">
             <label>프로젝트명</label>
@@ -1925,21 +2006,20 @@
             <input type="text" id="project-ip" placeholder="예: 청춘블라썸">
           </div>
           <div class="form-group">
-            <label>상태</label>
-            <select id="project-status">
-              <option value="preparing">준비중</option>
-              <option value="active">진행중</option>
-              <option value="completed">완료</option>
-            </select>
+            <label>층 (복수 선택 가능)</label>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">
+              <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer;"><input type="checkbox" class="project-floor-cb" value="2층"> 2층</label>
+              <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer;"><input type="checkbox" class="project-floor-cb" value="3층"> 3층</label>
+              <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer;"><input type="checkbox" class="project-floor-cb" value="4층"> 4층</label>
+            </div>
           </div>
           <div class="form-group">
-            <label>층</label>
-            <select id="project-floor">
-              <option value="1층">1층</option>
-              <option value="2층">2층</option>
-              <option value="3층">3층</option>
-              <option value="4층">4층</option>
-              <option value="전체">전체</option>
+            <label>운영 형태</label>
+            <select id="project-operation-type" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+              <option value="alba">알바 운영</option>
+              <option value="shelf">매대 증설</option>
+              <option value="mixed">혼합</option>
+              <option value="other">기타</option>
             </select>
           </div>
           <div class="form-group">
@@ -1951,13 +2031,65 @@
             <input type="date" id="project-end-date">
           </div>
           <div class="form-group">
-            <label>예상 매출 (원)</label>
-            <input type="number" id="project-expected-revenue" placeholder="0">
+            <label>상태</label>
+            <select id="project-status" style="width:100%; padding:10px; border:1.5px solid var(--gray-200); border-radius:8px; font-family:inherit;">
+              <option value="preparing">준비중</option>
+              <option value="active">진행중</option>
+              <option value="completed">완료</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 인원 계획 -->
+        <div style="font-size:12px; font-weight:700; color:var(--gray-500); text-transform:uppercase; letter-spacing:1px; margin:20px 0 8px;">인원 계획</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>필요 알바 수</label>
+            <input type="number" id="project-required-alba" placeholder="0" min="0">
           </div>
           <div class="form-group">
-            <label>실제 매출 (원)</label>
-            <input type="number" id="project-actual-revenue" placeholder="0">
+            <label>정직원 배정 (담당자)</label>
+            <input type="text" id="project-assigned-staff" placeholder="예: 이슬">
           </div>
+        </div>
+
+        <!-- 비용 계획 -->
+        <div style="font-size:12px; font-weight:700; color:var(--gray-500); text-transform:uppercase; letter-spacing:1px; margin:20px 0 8px;">비용 계획</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label>인테리어/디자인비</label>
+            <input type="number" id="project-budget-interior" placeholder="0" min="0" oninput="calcProjectBudgetTotal()">
+          </div>
+          <div class="form-group">
+            <label>굿즈 제작비</label>
+            <input type="number" id="project-budget-production" placeholder="0" min="0" oninput="calcProjectBudgetTotal()">
+          </div>
+          <div class="form-group">
+            <label>증정용 굿즈 예산</label>
+            <input type="number" id="project-budget-giveaway" placeholder="0" min="0" oninput="calcProjectBudgetTotal()">
+          </div>
+          <div class="form-group">
+            <label>기타 비용</label>
+            <input type="number" id="project-budget-other" placeholder="0" min="0" oninput="calcProjectBudgetTotal()">
+          </div>
+        </div>
+        <div style="text-align:right; font-size:14px; margin-top:4px;">
+          <span style="color:var(--gray-600);">비용 합계: </span>
+          <span id="project-budget-total" style="font-weight:800; color:var(--red);">₩0</span>
+        </div>
+
+        <!-- 상품 계획 -->
+        <div style="font-size:12px; font-weight:700; color:var(--gray-500); text-transform:uppercase; letter-spacing:1px; margin:20px 0 8px;">상품 계획</div>
+        <div class="form-group">
+          <label>메모/설명 (어떤 상품이 들어오는지)</label>
+          <textarea id="project-product-memo" placeholder="예: 전독시 전 상품 + 신상 아크릴..." style="height:60px;"></textarea>
+        </div>
+
+        <!-- 목표 -->
+        <div style="font-size:12px; font-weight:700; color:var(--gray-500); text-transform:uppercase; letter-spacing:1px; margin:20px 0 8px;">목표</div>
+        <div class="form-group">
+          <label>목표 매출 (원)</label>
+          <input type="number" id="project-target-revenue" placeholder="0" min="0">
         </div>
         <div class="form-group" style="margin-top:4px;">
           <label>메모</label>

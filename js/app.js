@@ -13,6 +13,19 @@ function isManager(user) {
   return false;
 }
 
+function isScheduleEditor(user) {
+  if (!user || !user.profile) return false;
+  const name = user.profile.name || '';
+  const role = user.profile.role || '';
+  // 스케줄 편집: 매니저(이슬) + 임원만
+  if (name === '이슬' || name === '이슬M') return true;
+  if (role === 'manager') return true;
+  return isManager(user);
+}
+
+let _currentUserIsScheduleEditor = true;
+let _currentUserIsManager = true;
+
 // ---- Toast Notifications ----
 function showToast(message, type = 'info') {
   const container = document.getElementById('toast-container');
@@ -1242,12 +1255,16 @@ function loadSchedule() {
   });
 
   // Also restore 휴무/연차 from the default staff data if first load
-  // Check if we have the known staff, add them if not
   ['이슬M', '김형희', '문지민', '윤진별', '김아현PT'].forEach(name => {
     if (!scheduleGridData[name]) scheduleGridData[name] = {};
   });
 
-  renderScheduleGrid();
+  // 권한 체크
+  getCurrentUser().then(user => {
+    _currentUserIsScheduleEditor = user ? isScheduleEditor(user) : false;
+    _currentUserIsManager = user ? isManager(user) : false;
+    renderScheduleGrid();
+  }).catch(() => renderScheduleGrid());
 }
 
 function prevMonth() {
@@ -1307,10 +1324,19 @@ function renderScheduleGrid() {
   html += '<th style="text-align:center; min-width:45px; padding:4px; border:1px solid var(--gray-200);">합계</th></tr></thead>';
 
   // Staff rows
+  const canEdit = _currentUserIsScheduleEditor;
   html += '<tbody>';
   staffNames.forEach(name => {
     html += '<tr>';
-    html += '<td style="position:sticky; left:0; background:white; z-index:1; font-weight:600; white-space:nowrap; padding:4px 8px; border:1px solid var(--gray-200); cursor:pointer;" onclick="renameScheduleStaff(\'' + name.replace(/'/g, "\\'") + '\')" title="클릭하여 이름 변경">' + name + '</td>';
+    // 이름 + 삭제 버튼 (편집 권한 있을 때만)
+    if (canEdit) {
+      html += '<td style="position:sticky; left:0; background:white; z-index:1; font-weight:600; white-space:nowrap; padding:4px 4px 4px 8px; border:1px solid var(--gray-200);">' +
+        '<span style="cursor:pointer;" onclick="renameScheduleStaff(\'' + name.replace(/'/g, "\\'") + '\')" title="이름 변경">' + name + '</span>' +
+        ' <span style="cursor:pointer; color:var(--red); font-size:11px; opacity:0.5;" onclick="deleteScheduleStaff(\'' + name.replace(/'/g, "\\'") + '\')" title="삭제">✕</span>' +
+        '</td>';
+    } else {
+      html += '<td style="position:sticky; left:0; background:white; z-index:1; font-weight:600; white-space:nowrap; padding:4px 8px; border:1px solid var(--gray-200);">' + name + '</td>';
+    }
 
     let workDays = 0;
 
@@ -1332,17 +1358,22 @@ function renderScheduleGrid() {
       const cellStyle = getCellStyle(val, isWed);
       const cellText = getCellText(val);
 
-      html += '<td style="text-align:center; padding:2px; cursor:pointer; border:1px solid var(--gray-200); ' + cellStyle + '" ' +
-        (isWed ? '' : 'onclick="cycleCell(\'' + name.replace(/'/g, "\\'") + '\',\'' + dateStr + '\', this)"') +
-        '>' + cellText + '</td>';
+      if (canEdit && !isWed) {
+        html += '<td style="text-align:center; padding:2px; cursor:pointer; border:1px solid var(--gray-200); ' + cellStyle + '" ' +
+          'onclick="cycleCell(\'' + name.replace(/'/g, "\\'") + '\',\'' + dateStr + '\', this)">' + cellText + '</td>';
+      } else {
+        html += '<td style="text-align:center; padding:2px; border:1px solid var(--gray-200); ' + cellStyle + '">' + cellText + '</td>';
+      }
     }
 
     html += '<td style="text-align:center; font-weight:700; padding:4px; border:1px solid var(--gray-200);">' + workDays + '일</td>';
     html += '</tr>';
   });
 
-  // Add staff row
-  html += '<tr><td colspan="' + (daysInMonth + 2) + '" style="text-align:center; padding:8px; cursor:pointer; color:var(--primary); font-weight:600; border:1px solid var(--gray-200);" onclick="addScheduleStaff()">+ 직원 추가</td></tr>';
+  // Add staff row (편집 권한 있을 때만)
+  if (canEdit) {
+    html += '<tr><td colspan="' + (daysInMonth + 2) + '" style="text-align:center; padding:8px; cursor:pointer; color:var(--primary); font-weight:600; border:1px solid var(--gray-200);" onclick="addScheduleStaff()">+ 직원 추가</td></tr>';
+  }
 
   html += '</tbody></table>';
 
@@ -1480,6 +1511,14 @@ function addScheduleStaff() {
   const name = prompt('직원 이름을 입력하세요:');
   if (!name || !name.trim()) return;
   scheduleGridData[name.trim()] = {};
+  saveScheduleGrid();
+  renderScheduleGrid();
+}
+
+function deleteScheduleStaff(name) {
+  if (!confirm(name + ' 을(를) 스케줄에서 삭제할까요?')) return;
+  delete scheduleGridData[name];
+  saveScheduleGrid();
   renderScheduleGrid();
 }
 
@@ -1488,7 +1527,17 @@ function renameScheduleStaff(oldName) {
   if (!newName || !newName.trim() || newName.trim() === oldName) return;
   scheduleGridData[newName.trim()] = scheduleGridData[oldName];
   delete scheduleGridData[oldName];
+  saveScheduleGrid();
   renderScheduleGrid();
+}
+
+// 4월/5월 스케줄 초기화 (이슬 매니저 원본)
+function resetScheduleDefaults() {
+  if (!confirm('4월/5월 스케줄을 원본(이슬 매니저 작성)으로 초기화할까요? 현재 수정사항이 사라집니다.')) return;
+  localStorage.removeItem('gm_schedule');
+  getScheduleStore(); // re-populate defaults
+  loadSchedule();
+  showToast('4월/5월 스케줄이 초기화되었습니다.', 'success');
 }
 
 function downloadScheduleExcel() {
@@ -1669,11 +1718,21 @@ function calculateScheduleHours() {
       <td><strong>${name}</strong></td>
       <td style="font-weight:700; color:${weekColor};">${weekHours.toFixed(1)}시간</td>
       <td>${monthHours.toFixed(1)}시간</td>
-      <td>${hourlyRate.toLocaleString()}원</td>
-      <td style="font-weight:700;">${Math.round(totalPay).toLocaleString()}원</td>
+      ${_currentUserIsScheduleEditor ? `<td>${hourlyRate.toLocaleString()}원</td>
+      <td style="font-weight:700;">${Math.round(totalPay).toLocaleString()}원</td>` : ''}
       <td>${statusHtml}</td>
     </tr>`;
   }).join('');
+
+  // 시급/급여 헤더도 권한에 따라 숨기기
+  const hoursTable = tbody.closest('table');
+  if (hoursTable) {
+    const ths = hoursTable.querySelectorAll('thead th');
+    if (ths.length >= 6 && !_currentUserIsScheduleEditor) {
+      ths[3].style.display = 'none'; // 시급
+      ths[4].style.display = 'none'; // 예상 월급
+    }
+  }
 }
 
 // updateScheduleModalHours and deleteScheduleEntry removed - replaced by grid editor
@@ -1896,26 +1955,18 @@ function loadProjects() {
   const projects = getProjectStore();
 
   // Update stats
-  const now = new Date();
-  const thisMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-
   const activeCount = projects.filter(p => p.status === 'active').length;
   const completedCount = projects.filter(p => p.status === 'completed').length;
   const totalWorkers = projects.filter(p => p.status === 'active').reduce((sum, p) => sum + (p.workers ? p.workers.length : 0), 0);
 
-  // This month revenue: projects whose period overlaps this month
-  const monthStart = thisMonth + '-01';
-  const monthEnd = thisMonth + '-31';
-  const monthRevenue = projects.reduce((sum, p) => {
-    if (p.startDate <= monthEnd && p.endDate >= monthStart) {
-      return sum + (p.actualRevenue || 0);
-    }
-    return sum;
+  // Total planned budget for active projects
+  const activeBudget = projects.filter(p => p.status === 'active').reduce((sum, p) => {
+    return sum + (p.budgetInterior || 0) + (p.budgetProduction || 0) + (p.budgetGiveaway || 0) + (p.budgetOther || 0);
   }, 0);
 
   const el = (id) => document.getElementById(id);
   if (el('proj-stat-active')) el('proj-stat-active').textContent = activeCount;
-  if (el('proj-stat-revenue')) el('proj-stat-revenue').textContent = monthRevenue.toLocaleString() + '원';
+  if (el('proj-stat-budget')) el('proj-stat-budget').textContent = activeBudget.toLocaleString() + '원';
   if (el('proj-stat-workers')) el('proj-stat-workers').textContent = totalWorkers + '명';
   if (el('proj-stat-completed')) el('proj-stat-completed').textContent = completedCount;
 
@@ -2149,12 +2200,21 @@ function openProjectModal(projectId) {
   document.getElementById('project-name').value = '';
   document.getElementById('project-ip').value = '';
   document.getElementById('project-status').value = 'preparing';
-  document.getElementById('project-floor').value = '4층';
+  // Reset floor checkboxes
+  document.querySelectorAll('.project-floor-cb').forEach(cb => cb.checked = false);
+  document.getElementById('project-operation-type').value = 'alba';
   document.getElementById('project-start-date').value = '';
   document.getElementById('project-end-date').value = '';
-  document.getElementById('project-expected-revenue').value = '';
-  document.getElementById('project-actual-revenue').value = '';
+  document.getElementById('project-required-alba').value = '';
+  document.getElementById('project-assigned-staff').value = '';
+  document.getElementById('project-budget-interior').value = '';
+  document.getElementById('project-budget-production').value = '';
+  document.getElementById('project-budget-giveaway').value = '';
+  document.getElementById('project-budget-other').value = '';
+  document.getElementById('project-product-memo').value = '';
+  document.getElementById('project-target-revenue').value = '';
   document.getElementById('project-memo').value = '';
+  calcProjectBudgetTotal();
 
   if (projectId) {
     titleEl.textContent = '프로젝트 수정';
@@ -2166,12 +2226,24 @@ function openProjectModal(projectId) {
       document.getElementById('project-name').value = proj.name || '';
       document.getElementById('project-ip').value = proj.ip || '';
       document.getElementById('project-status').value = proj.status || 'preparing';
-      document.getElementById('project-floor').value = proj.floor || '4층';
+      // Set floor checkboxes
+      const floorVal = proj.floor || '';
+      document.querySelectorAll('.project-floor-cb').forEach(cb => {
+        cb.checked = floorVal.includes(cb.value);
+      });
+      document.getElementById('project-operation-type').value = proj.operationType || 'alba';
       document.getElementById('project-start-date').value = proj.startDate || '';
       document.getElementById('project-end-date').value = proj.endDate || '';
-      document.getElementById('project-expected-revenue').value = proj.expectedRevenue || '';
-      document.getElementById('project-actual-revenue').value = proj.actualRevenue || '';
+      document.getElementById('project-required-alba').value = proj.requiredAlba || '';
+      document.getElementById('project-assigned-staff').value = proj.assignedStaff || '';
+      document.getElementById('project-budget-interior').value = proj.budgetInterior || '';
+      document.getElementById('project-budget-production').value = proj.budgetProduction || '';
+      document.getElementById('project-budget-giveaway').value = proj.budgetGiveaway || '';
+      document.getElementById('project-budget-other').value = proj.budgetOther || '';
+      document.getElementById('project-product-memo').value = proj.productMemo || '';
+      document.getElementById('project-target-revenue').value = proj.targetRevenue || '';
       document.getElementById('project-memo').value = proj.memo || '';
+      calcProjectBudgetTotal();
     }
   } else {
     titleEl.textContent = '프로젝트 생성';
@@ -2180,16 +2252,36 @@ function openProjectModal(projectId) {
   openModal('project-modal');
 }
 
+function calcProjectBudgetTotal() {
+  const interior = parseInt(document.getElementById('project-budget-interior').value) || 0;
+  const production = parseInt(document.getElementById('project-budget-production').value) || 0;
+  const giveaway = parseInt(document.getElementById('project-budget-giveaway').value) || 0;
+  const other = parseInt(document.getElementById('project-budget-other').value) || 0;
+  const total = interior + production + giveaway + other;
+  const el = document.getElementById('project-budget-total');
+  if (el) el.textContent = '₩' + total.toLocaleString();
+}
+
 function saveProject() {
   const editId = document.getElementById('project-edit-id').value;
   const name = document.getElementById('project-name').value.trim();
   const ip = document.getElementById('project-ip').value.trim();
   const status = document.getElementById('project-status').value;
-  const floor = document.getElementById('project-floor').value;
+  // Collect floor checkboxes
+  const floorArr = [];
+  document.querySelectorAll('.project-floor-cb:checked').forEach(cb => floorArr.push(cb.value));
+  const floor = floorArr.join(', ');
+  const operationType = document.getElementById('project-operation-type').value;
   const startDate = document.getElementById('project-start-date').value;
   const endDate = document.getElementById('project-end-date').value;
-  const expectedRevenue = parseInt(document.getElementById('project-expected-revenue').value) || 0;
-  const actualRevenue = parseInt(document.getElementById('project-actual-revenue').value) || 0;
+  const requiredAlba = parseInt(document.getElementById('project-required-alba').value) || 0;
+  const assignedStaff = document.getElementById('project-assigned-staff').value.trim();
+  const budgetInterior = parseInt(document.getElementById('project-budget-interior').value) || 0;
+  const budgetProduction = parseInt(document.getElementById('project-budget-production').value) || 0;
+  const budgetGiveaway = parseInt(document.getElementById('project-budget-giveaway').value) || 0;
+  const budgetOther = parseInt(document.getElementById('project-budget-other').value) || 0;
+  const productMemo = document.getElementById('project-product-memo').value.trim();
+  const targetRevenue = parseInt(document.getElementById('project-target-revenue').value) || 0;
   const memo = document.getElementById('project-memo').value.trim();
 
   if (!name) { showToast('프로젝트명을 입력해주세요.', 'error'); return; }
@@ -2205,10 +2297,17 @@ function saveProject() {
       projects[idx].ip = ip;
       projects[idx].status = status;
       projects[idx].floor = floor;
+      projects[idx].operationType = operationType;
       projects[idx].startDate = startDate;
       projects[idx].endDate = endDate;
-      projects[idx].expectedRevenue = expectedRevenue;
-      projects[idx].actualRevenue = actualRevenue;
+      projects[idx].requiredAlba = requiredAlba;
+      projects[idx].assignedStaff = assignedStaff;
+      projects[idx].budgetInterior = budgetInterior;
+      projects[idx].budgetProduction = budgetProduction;
+      projects[idx].budgetGiveaway = budgetGiveaway;
+      projects[idx].budgetOther = budgetOther;
+      projects[idx].productMemo = productMemo;
+      projects[idx].targetRevenue = targetRevenue;
       projects[idx].memo = memo;
     }
     showToast('프로젝트가 수정되었습니다.', 'success');
@@ -2222,10 +2321,18 @@ function saveProject() {
       startDate: startDate,
       endDate: endDate,
       floor: floor,
-      expectedRevenue: expectedRevenue,
-      actualRevenue: actualRevenue,
+      operationType: operationType,
+      requiredAlba: requiredAlba,
+      assignedStaff: assignedStaff,
+      budgetInterior: budgetInterior,
+      budgetProduction: budgetProduction,
+      budgetGiveaway: budgetGiveaway,
+      budgetOther: budgetOther,
+      productMemo: productMemo,
+      targetRevenue: targetRevenue,
       memo: memo,
       workers: [],
+      costs: [],
       createdAt: new Date().toISOString().split('T')[0]
     });
     showToast('프로젝트가 생성되었습니다.', 'success');
