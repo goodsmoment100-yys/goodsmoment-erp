@@ -3560,76 +3560,43 @@ document.addEventListener('DOMContentLoaded', function() {
 // Messages (메시지)
 // ============================================
 
-function getMessageStore() {
-  try {
-    var data = JSON.parse(localStorage.getItem('gm_messages') || 'null');
-    if (data !== null) return data;
-  } catch (e) {}
-
-  // Pre-populate sample messages
-  var defaults = [
-    {
-      id: 'msg_001',
-      from: 'system_pjm',
-      fromName: '박정미',
-      to: 'all',
-      toName: '전체',
-      content: '4월 정산 자료 준비 부탁드립니다',
-      createdAt: '2026-04-03T10:00:00'
-    },
-    {
-      id: 'msg_002',
-      from: 'system_ls',
-      fromName: '이슬',
-      to: 'all',
-      toName: '전체',
-      content: '내일 2층 디피 변경 예정입니다',
-      createdAt: '2026-04-03T14:30:00'
-    }
-  ];
-  localStorage.setItem('gm_messages', JSON.stringify(defaults));
-  return defaults;
-}
-
-function setMessageStore(data) {
-  localStorage.setItem('gm_messages', JSON.stringify(data));
-}
-
 async function loadMessages() {
   var user = await getCurrentUser();
-  var messages = getMessageStore();
   var listEl = document.getElementById('message-list');
   if (!listEl) return;
 
   var myId = user ? user.id : '';
-  var myName = (user && user.profile) ? user.profile.name : '';
+
+  // Supabase에서 메시지 로드 (전체 + 내가 보낸/받은)
+  var { data: messages, error } = await sb
+    .from('messages')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error || !messages) messages = [];
 
   if (messages.length === 0) {
     listEl.innerHTML = '<div class="empty-state"><p>메시지가 없습니다.</p></div>';
     return;
   }
 
-  // Sort newest first
-  var sorted = messages.slice().sort(function(a, b) {
-    return new Date(b.createdAt) - new Date(a.createdAt);
-  });
-
-  listEl.innerHTML = sorted.map(function(msg) {
-    var isMine = (msg.from === myId || msg.fromName === myName);
-    var isAll = (msg.to === 'all');
-    var timeStr = new Date(msg.createdAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    var toLabel = isAll ? '<span style="display:inline-block; padding:1px 6px; border-radius:4px; font-size:11px; font-weight:600; background:var(--blue-bg); color:var(--blue);">전체</span>' : msg.toName;
+  listEl.innerHTML = messages.map(function(msg) {
+    var isMine = (msg.from_id === myId);
+    var isAll = msg.is_broadcast;
+    var timeStr = new Date(msg.created_at).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    var toLabel = isAll ? '<span style="display:inline-block; padding:1px 6px; border-radius:4px; font-size:11px; font-weight:600; background:var(--blue-bg); color:var(--blue);">전체</span>' : (msg.to_name || '');
 
     var align = isMine ? 'flex-end' : 'flex-start';
     var bubbleClass = isMine ? 'mine' : (isAll ? 'broadcast' : 'others');
 
     return '<div style="display:flex; flex-direction:column; align-items:' + align + '; margin-bottom:16px;">' +
       '<div style="font-size:11px; color:var(--gray-400); margin-bottom:4px;">' +
-        '<strong style="color:var(--gray-700);">' + msg.fromName + '</strong>' +
+        '<strong style="color:var(--gray-700);">' + (msg.from_name || '') + '</strong>' +
         ' &rarr; ' + toLabel +
         ' &middot; ' + timeStr +
       '</div>' +
-      '<div class="message-bubble ' + bubbleClass + '">' + msg.content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' +
+      '<div class="message-bubble ' + bubbleClass + '">' + (msg.content || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') + '</div>' +
     '</div>';
   }).join('');
 }
@@ -3678,18 +3645,21 @@ async function sendMessage() {
   var selectedOption = toSelect.options[toSelect.selectedIndex];
   var toName = toValue === 'all' ? '전체' : (selectedOption.getAttribute('data-name') || toValue);
 
-  var messages = getMessageStore();
-  messages.push({
-    id: 'msg_' + Date.now(),
-    from: fromId,
-    fromName: fromName,
-    to: toValue,
-    toName: toName,
+  var isBroadcast = (toValue === 'all');
+  var { error } = await sb.from('messages').insert({
+    from_id: fromId,
+    from_name: fromName,
+    to_id: isBroadcast ? null : toValue,
+    to_name: toName,
     content: content,
-    createdAt: new Date().toISOString()
+    is_broadcast: isBroadcast
   });
 
-  setMessageStore(messages);
+  if (error) {
+    showToast('메시지 전송 실패: ' + error.message, 'error');
+    return;
+  }
+
   closeModal('message-modal');
   showToast('메시지가 전송되었습니다.', 'success');
   loadMessages();
