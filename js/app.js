@@ -1941,10 +1941,78 @@ async function saveHRData() {
 
 function getProjectStore() {
   try {
-    return JSON.parse(localStorage.getItem('gm_projects') || '[]');
-  } catch (e) {
-    return [];
-  }
+    const existing = JSON.parse(localStorage.getItem('gm_projects') || 'null');
+    if (existing !== null) return existing;
+  } catch (e) {}
+
+  // 기본 프로젝트: 전독시 팝업 (완료)
+  const defaults = [
+    {
+      id: 'proj_jeondog',
+      name: '전지적 독자시점 POP UP 연남',
+      ip: '전지적 독자시점',
+      status: 'completed',
+      startDate: '2026-01-15',
+      endDate: '2026-02-28',
+      floor: '4층',
+      operationType: 'alba',
+      requiredAlba: 15,
+      assignedStaff: '이슬',
+      budgetInterior: 15000000,
+      budgetProduction: 2860000,
+      budgetGiveaway: 0,
+      budgetOther: 67535236,
+      targetRevenue: 400000000,
+      productMemo: '전독시 전 상품 라인업 (아크릴, 키링, 인형, 장패드 등)',
+      memo: '팝업 전체 매출 4.28억, 비용 8,540만원, 실질이익 2,088만원. 4층 임대료 월 400만원 상향 제안받음.',
+      workers: [],
+      costs: [
+        { item: '인테리어 (목공/시트/전기)', desc: '김성기, 백승현, 백상용, 한대현, 삼성인테리어 등', amount: 15000000 },
+        { item: '쇼핑백 제작', desc: '굿즈모먼트 쇼핑백', amount: 2860000 },
+        { item: '디자인/인쇄', desc: '신화광고, 에이프린트, 에이치제이메이커스 등', amount: 12000000 },
+        { item: '위탁/설치', desc: '김화령 위탁료, 넥스트아트, 리움 등', amount: 20000000 },
+        { item: '기타 (물류/소모품)', desc: '토빅스, 일성양행, 구성이엔아이 등', amount: 35535236 }
+      ],
+      createdAt: '2026-01-10'
+    },
+    {
+      id: 'proj_hwasan',
+      name: '화산귀환 팝업',
+      ip: '화산귀환',
+      status: 'preparing',
+      startDate: '2026-05-01',
+      endDate: '2026-05-17',
+      floor: '4층',
+      operationType: 'alba',
+      requiredAlba: 8,
+      assignedStaff: '',
+      budgetInterior: 0,
+      budgetProduction: 0,
+      budgetGiveaway: 0,
+      budgetOther: 0,
+      targetRevenue: 0,
+      productMemo: '',
+      memo: '',
+      workers: [],
+      costs: [],
+      createdAt: '2026-04-01'
+    }
+  ];
+
+  localStorage.setItem('gm_projects', JSON.stringify(defaults));
+
+  // 전독시 팝업 정산 데이터도 저장
+  const popupSettlement = {
+    'proj_jeondog': {
+      actualRevenue: 428126700,
+      totalCost: 85395236,
+      profit: 20875539,
+      date: '2026-03-15'
+    }
+  };
+  localStorage.setItem('gm_popup_settlement', JSON.stringify(popupSettlement));
+
+  return defaults;
 }
 
 function setProjectStore(data) {
