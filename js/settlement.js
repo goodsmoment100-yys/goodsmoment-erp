@@ -494,28 +494,33 @@ function downloadAllSettlements() {
 
 // ---- 탭 전환 ----
 function switchSettleTab(tab) {
-  const publisherTab = document.getElementById('settle-tab-publisher');
-  const urbanTab = document.getElementById('settle-tab-urban');
-  const publisherBtn = document.getElementById('settle-tab-btn-publisher');
-  const urbanBtn = document.getElementById('settle-tab-btn-urban');
+  const tabs = ['publisher', 'urban', 'popup'];
+  tabs.forEach(t => {
+    const el = document.getElementById('settle-tab-' + t);
+    const btn = document.getElementById('settle-tab-btn-' + t);
+    if (el) el.style.display = (t === tab) ? 'block' : 'none';
+    if (btn) {
+      btn.style.borderBottomColor = (t === tab) ? 'var(--primary)' : 'transparent';
+      btn.style.color = (t === tab) ? 'var(--primary)' : 'var(--gray-500)';
+    }
+  });
 
-  if (tab === 'publisher') {
-    if (publisherTab) publisherTab.style.display = 'block';
-    if (urbanTab) urbanTab.style.display = 'none';
-    if (publisherBtn) { publisherBtn.style.borderBottomColor = 'var(--primary)'; publisherBtn.style.color = 'var(--primary)'; }
-    if (urbanBtn) { urbanBtn.style.borderBottomColor = 'transparent'; urbanBtn.style.color = 'var(--gray-500)'; }
-  } else {
-    if (publisherTab) publisherTab.style.display = 'none';
-    if (urbanTab) urbanTab.style.display = 'block';
-    if (publisherBtn) { publisherBtn.style.borderBottomColor = 'transparent'; publisherBtn.style.color = 'var(--gray-500)'; }
-    if (urbanBtn) { urbanBtn.style.borderBottomColor = 'var(--primary)'; urbanBtn.style.color = 'var(--primary)'; }
-
-    // Set default month
+  if (tab === 'urban') {
     const monthInput = document.getElementById('urban-settle-month');
     if (monthInput && !monthInput.value) {
       const now = new Date();
       const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
       monthInput.value = lastMonth.getFullYear() + '-' + String(lastMonth.getMonth() + 1).padStart(2, '0');
+    }
+  }
+
+  if (tab === 'popup') {
+    // 프로젝트 목록 로드
+    const select = document.getElementById('popup-settle-project');
+    if (select) {
+      const projects = JSON.parse(localStorage.getItem('gm_projects') || '[]');
+      select.innerHTML = '<option value="">프로젝트를 선택하세요</option>' +
+        projects.map(p => '<option value="' + p.id + '">' + p.name + ' (' + (p.floor || '') + ', ' + (p.startDate || '') + '~)</option>').join('');
     }
   }
 }
@@ -690,6 +695,112 @@ function handleGachaUpload(file) {
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+// ---- 팝업 정산 ----
+function loadPopupSettlement() {
+  const select = document.getElementById('popup-settle-project');
+  const content = document.getElementById('popup-settle-content');
+  const projectId = select ? select.value : '';
+  if (!projectId) { if (content) content.style.display = 'none'; return; }
+  if (content) content.style.display = 'block';
+
+  const projects = JSON.parse(localStorage.getItem('gm_projects') || '[]');
+  const project = projects.find(p => p.id === projectId);
+  if (!project) return;
+
+  const fmt = n => '₩' + (n || 0).toLocaleString();
+  const el = id => document.getElementById(id);
+
+  const interior = project.budgetInterior || 0;
+  const production = project.budgetProduction || 0;
+  const giveaway = project.budgetGiveaway || 0;
+  let laborCost = 0;
+  if (project.workers) {
+    project.workers.forEach(w => {
+      const days = Math.max(1, Math.ceil((new Date(w.endDate || project.endDate) - new Date(w.startDate || project.startDate)) / 86400000) + 1);
+      laborCost += (w.hourlyRate || 10320) * 8 * days;
+    });
+  }
+  let otherCosts = 0;
+  if (project.costs) project.costs.forEach(c => { otherCosts += c.amount || 0; });
+  otherCosts += project.budgetOther || 0;
+  const totalCost = interior + production + giveaway + laborCost + otherCosts;
+
+  if (el('popup-cost-interior')) el('popup-cost-interior').textContent = fmt(interior);
+  if (el('popup-cost-production')) el('popup-cost-production').textContent = fmt(production);
+  if (el('popup-cost-giveaway')) el('popup-cost-giveaway').textContent = fmt(giveaway);
+  if (el('popup-cost-labor')) el('popup-cost-labor').textContent = fmt(laborCost);
+  if (el('popup-cost-total')) el('popup-cost-total').textContent = fmt(totalCost);
+
+  const popupHistory = JSON.parse(localStorage.getItem('gm_popup_settlement') || '{}');
+  if (popupHistory[projectId] && el('popup-actual-revenue')) {
+    el('popup-actual-revenue').value = popupHistory[projectId].actualRevenue || '';
+  }
+  calculatePopupSettlement();
+}
+
+function calculatePopupSettlement() {
+  const el = id => document.getElementById(id);
+  const fmt = n => '₩' + (n || 0).toLocaleString();
+  const revenue = parseInt(el('popup-actual-revenue')?.value) || 0;
+  const costText = el('popup-cost-total')?.textContent || '₩0';
+  const totalCost = parseInt(costText.replace(/[₩,]/g, '')) || 0;
+  const profit = revenue - totalCost;
+
+  if (el('popup-result-revenue')) el('popup-result-revenue').textContent = fmt(revenue);
+  if (el('popup-result-cost')) el('popup-result-cost').textContent = fmt(totalCost);
+  if (el('popup-result-profit')) {
+    el('popup-result-profit').textContent = fmt(profit);
+    el('popup-result-profit').style.color = profit >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+
+  const select = document.getElementById('popup-settle-project');
+  if (select && select.value && revenue > 0) {
+    const history = JSON.parse(localStorage.getItem('gm_popup_settlement') || '{}');
+    history[select.value] = { actualRevenue: revenue, totalCost: totalCost, profit: profit, date: new Date().toISOString() };
+    localStorage.setItem('gm_popup_settlement', JSON.stringify(history));
+  }
+}
+
+function downloadPopupSettlement() {
+  const select = document.getElementById('popup-settle-project');
+  if (!select || !select.value) { showToast('프로젝트를 선택하세요', 'error'); return; }
+  const projects = JSON.parse(localStorage.getItem('gm_projects') || '[]');
+  const project = projects.find(p => p.id === select.value);
+  if (!project) return;
+
+  const revenue = parseInt(document.getElementById('popup-actual-revenue')?.value) || 0;
+  const costText = document.getElementById('popup-cost-total')?.textContent || '₩0';
+  const totalCost = parseInt(costText.replace(/[₩,]/g, '')) || 0;
+
+  const wb = XLSX.utils.book_new();
+  const data = [
+    ['팝업 프로젝트 정산서'], [],
+    ['프로젝트명', '', project.name],
+    ['IP/작품', '', project.ip || ''],
+    ['기간', '', (project.startDate || '') + ' ~ ' + (project.endDate || '')],
+    ['층', '', project.floor || ''],
+    [],
+    ['[비용]'],
+    ['인테리어/디자인', '', project.budgetInterior || 0],
+    ['굿즈 제작', '', project.budgetProduction || 0],
+    ['증정 굿즈', '', project.budgetGiveaway || 0],
+    ['알바 인건비', '', parseInt(document.getElementById('popup-cost-labor')?.textContent?.replace(/[₩,]/g, '')) || 0],
+    ['기타', '', project.budgetOther || 0],
+    ['비용 합계', '', totalCost],
+    [],
+    ['[매출]'],
+    ['실제 매출', '', revenue],
+    [],
+    ['[순익]'],
+    ['매출 - 비용', '', revenue - totalCost],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{wch:16},{wch:4},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws, '팝업정산');
+  XLSX.writeFile(wb, project.name + '_정산서.xlsx');
+  showToast(project.name + ' 정산서 다운로드 완료', 'success');
 }
 
 // ---- 어반플레이 정산서 다운로드 ----
